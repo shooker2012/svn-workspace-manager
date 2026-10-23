@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SvnWorkspaceManager.Cli/SvnWorkspaceManager.Cli.csproj" />
+    <Project Path="src/SvnWorkspaceManager.Core/SvnWorkspaceManager.Core.csproj" />
+    <Project Path="src/SvnWorkspaceManager.Gui/SvnWorkspaceManager.Gui.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SvnWorkspaceManager.Tests/SvnWorkspaceManager.Tests.csproj" />
+  </Folder>
+</Solution>
