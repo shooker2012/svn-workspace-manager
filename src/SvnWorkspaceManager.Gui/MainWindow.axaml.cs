@@ -347,6 +347,14 @@ public partial class MainWindow : Window
                 return;
             case TaskListStatus.Ready:
                 var state = _store.LoadState();
+                if (state.Mode == WorkspaceMode.TaskMapping
+                    && !task.Equals(state.ActiveTask, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!await ConfirmAsync(
+                            "确认切换任务",
+                            $"当前任务“{state.ActiveTask}”正在映射。切换到任务“{task}”后，原项目路径会改为使用该任务的代码，当前任务的工作区会保留。是否继续？",
+                            "确认切换")) return;
+                }
                 await RunActionAsync(
                     state.Mode == WorkspaceMode.TaskMapping ? $"切换到任务 {task}" : $"进入任务映射 {task}",
                     token => state.Mode == WorkspaceMode.TaskMapping
