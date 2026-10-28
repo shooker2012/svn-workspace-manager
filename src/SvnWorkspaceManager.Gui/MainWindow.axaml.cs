@@ -328,6 +328,10 @@ public partial class MainWindow : Window
             case TaskListStatus.NeedsUpdate:
                 await RunActionAsync($"更新任务 {task}", token => _service.UpdateTaskAsync(task, token));
                 return;
+            case TaskListStatus.NeedsConflict:
+                TaskList.SelectedItem = item;
+                SetMessage($"任务“{task}”存在 SVN 冲突或阻断状态，更新命令已保留冲突内容，不会自动覆盖。{Environment.NewLine}{item.AssessmentDetails}{Environment.NewLine}请先在 SVN 工具中解决冲突并清理工作副本，再点击“刷新状态”。", true);
+                return;
             case TaskListStatus.ParentBlocked:
             {
                 TaskList.SelectedItem = item;
@@ -894,6 +898,9 @@ public sealed class TaskListItem
     {
         Name = task.Name;
         RootPath = task.RootPath;
+        AssessmentDetails = assessment.Directories.Count == 0
+            ? assessment.Summary
+            : string.Join(Environment.NewLine, assessment.Directories.Select(directory => $"{directory.RelativePath}：{directory.Reason}"));
         Status = TaskListOrdering.GetStatus(task.Name, valid, assessment, activeTask, parentStatus, mode);
         IsActive = Status == TaskListStatus.CurrentTask;
         DisplayName = IsActive ? $"当前任务 · {task.Name}" : task.Name;
@@ -905,6 +912,7 @@ public sealed class TaskListItem
             TaskListStatus.Ready => ("\uE8AB", "进入或切换到此任务映射"),
             TaskListStatus.ParentBlocked => ("\uE90F", "任务本身已就绪；父目录存在已跟踪修改或冲突，先清理父目录即可进入映射"),
             TaskListStatus.NeedsMigration => ("\uE8B5", "任务已就绪；父目录有未版本化文件，点击迁移到任务并进入映射"),
+            TaskListStatus.NeedsConflict => ("\uE783", "任务存在 SVN 冲突或阻断状态；请先解决冲突并刷新状态"),
             TaskListStatus.NeedsUpdate => ("\uE72C", "任务版本落后；点击直接更新到 trunk"),
             _ => ("\uE783", "任务目录不完整")
         };
@@ -914,18 +922,20 @@ public sealed class TaskListItem
             TaskListStatus.Ready => "● 可进入映射",
             TaskListStatus.ParentBlocked => "● 任务已就绪 · 先清理父目录",
             TaskListStatus.NeedsMigration => "● 任务已就绪 · 需迁移本地文件",
+            TaskListStatus.NeedsConflict => "⚠ 需处理冲突",
             TaskListStatus.NeedsUpdate => "⚠ 需更新",
             _ => "⚠ 目录不完整"
         };
         var parentBlocked = Status == TaskListStatus.ParentBlocked;
-        Background = new SolidColorBrush(Color.Parse(Status == TaskListStatus.CurrentTask ? "#DCEBFF" : Status == TaskListStatus.Incomplete ? "#FFE1E1" : parentBlocked ? "#E6F5EA" : taskReadyWithParentAction ? "#EAF6EE" : green ? "#DFF5E3" : "#FFF4D6"));
-        Foreground = new SolidColorBrush(Color.Parse(Status == TaskListStatus.CurrentTask ? "#1557A6" : Status == TaskListStatus.Incomplete ? "#B42318" : parentBlocked ? "#2C7A4B" : taskReadyWithParentAction ? "#3C7A5A" : green ? "#237A3B" : "#936400"));
+        Background = new SolidColorBrush(Color.Parse(Status == TaskListStatus.CurrentTask ? "#DCEBFF" : Status is TaskListStatus.Incomplete or TaskListStatus.NeedsConflict ? "#FFE1E1" : parentBlocked ? "#E6F5EA" : taskReadyWithParentAction ? "#EAF6EE" : green ? "#DFF5E3" : "#FFF4D6"));
+        Foreground = new SolidColorBrush(Color.Parse(Status == TaskListStatus.CurrentTask ? "#1557A6" : Status is TaskListStatus.Incomplete or TaskListStatus.NeedsConflict ? "#B42318" : parentBlocked ? "#2C7A4B" : taskReadyWithParentAction ? "#3C7A5A" : green ? "#237A3B" : "#936400"));
         ActionForeground = new SolidColorBrush(Color.Parse(Status switch
         {
             TaskListStatus.Ready => "#2F6FEB",
             TaskListStatus.CurrentTask => "#237A3B",
             TaskListStatus.ParentBlocked => "#2C7A4B",
             TaskListStatus.NeedsMigration => "#3C7A5A",
+            TaskListStatus.NeedsConflict => "#B42318",
             TaskListStatus.Incomplete => "#B42318",
             _ => "#936400"
         }));
@@ -937,10 +947,11 @@ public sealed class TaskListItem
     public string Name { get; }
     public string RootPath { get; }
     public string DisplayName { get; }
-    public bool CanUse => Status is TaskListStatus.Ready or TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration or TaskListStatus.NeedsUpdate;
+    public bool CanUse => Status is TaskListStatus.Ready or TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration or TaskListStatus.NeedsUpdate or TaskListStatus.NeedsConflict;
     public bool CanDelete => !IsActive;
     public string UseGlyph { get; }
     public string UseToolTip { get; }
+    public string AssessmentDetails { get; }
     public IBrush ActionForeground { get; }
     public string StatusText { get; }
     public TaskListStatus Status { get; }

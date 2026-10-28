@@ -10,8 +10,9 @@ public enum TaskListStatus
     NeedsMigration = 3,
 
     // 任务本身尚未就绪：必须先更新任务版本，或任务目录不完整。
-    NeedsUpdate = 4,
-    Incomplete = 5
+    NeedsConflict = 4,
+    NeedsUpdate = 5,
+    Incomplete = 6
 }
 
 public enum ParentWorkspaceStatus
@@ -35,6 +36,8 @@ public static class TaskListOrdering
             && taskName.Equals(activeTask, StringComparison.OrdinalIgnoreCase))
             return TaskListStatus.CurrentTask;
         if (!isValid) return TaskListStatus.Incomplete;
+        if (assessment.Directories.Any(directory => directory.HasBlockingStatus))
+            return TaskListStatus.NeedsConflict;
         if (!assessment.IsReady) return TaskListStatus.NeedsUpdate;
         if (mode == WorkspaceMode.Normal)
         {
