@@ -121,15 +121,19 @@ public partial class MainWindow : Window
             ? null
             : _store.ListTasks().FirstOrDefault(task => string.Equals(task.Name, state.ActiveTask, StringComparison.OrdinalIgnoreCase));
         WorkspacePathText.Text = state.Mode == WorkspaceMode.TaskMapping
-            ? $"任务路径：{activeTask?.RootPath ?? configuration.ProjectRoot}"
-            : $"项目路径：{configuration.ProjectRoot}";
+            ? $"工作区：映射 · {activeTask?.Name ?? state.ActiveTask ?? "未知任务"}"
+            : "工作区：普通模式";
+        ToolTip.SetTip(WorkspacePathText, state.Mode == WorkspaceMode.TaskMapping
+            ? activeTask?.RootPath ?? configuration.ProjectRoot
+            : configuration.ProjectRoot);
         var snapshot = await _service.GetStatusAsync(cancellationToken);
         var assessment = snapshot.RestoreAssessment;
         _restoreAssessment = assessment;
         _isolationDirectories = snapshot.IsolationDirectories;
-        PublicStatusText.Text = snapshot.ProjectStatus.Succeeded
-            ? "公共工作区状态：已读取"
-            : $"公共工作区状态：检查失败（{snapshot.ProjectStatus.StandardError.Trim()}）";
+        PublicStatusText.Text = snapshot.ProjectStatus.Succeeded ? "公共工作区：正常" : "公共工作区：读取失败";
+        ToolTip.SetTip(PublicStatusText, snapshot.ProjectStatus.Succeeded
+            ? "公共工作区 SVN 状态读取成功。"
+            : snapshot.ProjectStatus.StandardError.Trim());
         var parentStatus = GetParentWorkspaceStatus();
         var taskItems = TaskListOrdering.OrderForDisplay(
                 tasks.Select(task => new TaskListItem(task, IsTaskValid(task, configuration), taskAssessments[task.Name], state.ActiveTask, parentStatus, state.Mode)),
@@ -160,12 +164,16 @@ public partial class MainWindow : Window
             ? $"! 上次操作未完成：{interrupted.Phase}"
             : assessment.IsReady ? "● 可以恢复到原目录" : state.Mode == WorkspaceMode.TaskMapping ? "! 不能恢复到原目录" : "— 当前不是任务映射模式";
         RevisionStatusText.Text = interrupted is not null
-            ? $"未完成操作：{interrupted.Kind} / {interrupted.Phase} / {interrupted.CurrentDirectory ?? "无"}{Environment.NewLine}{(string.IsNullOrWhiteSpace(interrupted.Error) ? "点击右侧按钮继续。" : interrupted.Error)}"
+            ? "上次操作未完成，点击右侧按钮继续"
+            : assessment.IsReady ? "所有隔离目录均满足恢复条件" : "当前不可恢复";
+        ToolTip.SetTip(RevisionStatusText, interrupted is not null
+            ? $"{interrupted.Kind} / {interrupted.Phase} / {interrupted.CurrentDirectory ?? "无"}{Environment.NewLine}{(string.IsNullOrWhiteSpace(interrupted.Error) ? "点击右侧按钮继续。" : interrupted.Error)}"
             : assessment.Directories.Count == 0
                 ? "进入任务映射模式后，这里会显示任务 svnversion 和恢复目标。"
                 : string.Join(Environment.NewLine, assessment.Directories.Select(directory =>
-                    $"{directory.RelativePath}：任务工作副本 {(directory.TaskRevision is null ? "未知" : $"r{directory.TaskRevision}")} / 恢复目标 {(directory.TargetRevision is null ? "未知" : $"r{directory.TargetRevision}")} — {directory.Reason}"));
-        SetMessage($"项目目录：{configuration.ProjectRoot}\n任务目录：{configuration.TaskRoot}\n隔离目录：{string.Join(", ", configuration.IsolatedDirectories)}\n\n{assessment.Summary}");
+                    $"{directory.RelativePath}：任务工作副本 {(directory.TaskRevision is null ? "未知" : $"r{directory.TaskRevision}")} / 恢复目标 {(directory.TargetRevision is null ? "未知" : $"r{directory.TargetRevision}")} — {directory.Reason}")));
+        if (MessageTitle.Text != "操作失败")
+            SetMessage($"状态已刷新：{assessment.Summary}");
         }
         catch (OperationCanceledException)
         {
@@ -549,42 +557,52 @@ public partial class MainWindow : Window
         var parentBlocked = parentStatus == ParentWorkspaceStatus.Blocked;
         var damaged = problems.Any(directory => directory.Error is not null);
         var parentDamaged = _isolationDirectories.Any(directory => !directory.Exists || directory.IsJunction || directory.Error is not null);
-        SetCheck(ParentCheckText,
+        var parentSummary =
             _isolationDirectories.Count == 0
-                ? "✗ 尚未配置隔离目录"
+                ? "父目录：未配置"
                 : parentClean
-                    ? $"✓ 父级隔离目录干净：{string.Join("、", _isolationDirectories.Select(directory => $"{directory.RelativePath} r{directory.Revision}"))}"
+                    ? "父目录：干净"
                     : parentDamaged
-                        ? $"⚠ 父级隔离目录状态异常：{string.Join("；", problems.Select(DescribeIsolationProblem))}"
+                        ? "父目录：状态异常"
                         : parentBlocked
-                            ? $"● 父级隔离目录存在已跟踪修改或冲突：{string.Join("；", problems.Select(DescribeIsolationProblem))}"
-                            : $"● 父级隔离目录有未版本化或忽略内容：{string.Join("；", problems.Select(DescribeIsolationProblem))}（进入映射时会迁移到任务）",
-            parentClean ? "#237A3B" : parentDamaged ? "#936400" : "#2C7A4B");
+                            ? "父目录：有已跟踪修改"
+                            : "父目录：有待迁移文件";
+        SetCheck(ParentCheckText, parentSummary, parentClean ? "#237A3B" : parentDamaged ? "#936400" : "#2C7A4B");
+        ToolTip.SetTip(ParentCheckText, _isolationDirectories.Count == 0
+            ? "尚未配置隔离目录。"
+            : parentClean
+                ? string.Join("、", _isolationDirectories.Select(directory => $"{directory.RelativePath} r{directory.Revision}"))
+                : string.Join("；", problems.Select(DescribeIsolationProblem)));
 
         var hasSelection = !string.IsNullOrWhiteSpace(selected);
         var taskReady = selectedAssessment?.IsReady == true;
-        SetCheck(TaskCheckText,
+        var taskSummary =
             !hasSelection
-                ? "— 先在左侧选择一个任务"
+                ? "任务：请先选择"
                 : taskReady
-                    ? $"✓ 任务 {selected} 已包含 trunk 目录的最新变更（r{selectedAssessment!.Directories.FirstOrDefault()?.TargetRevision}）"
-                    : $"✗ 任务 {selected}：{selectedAssessment?.Summary ?? "尚未检查完成"}",
-            taskReady ? "#237A3B" : hasSelection ? "#936400" : "#637083");
+                    ? "任务：已就绪"
+                    : selectedAssessment?.Directories.Any(directory => directory.HasBlockingStatus) == true
+                        ? "任务：需处理冲突"
+                        : "任务：需更新";
+        SetCheck(TaskCheckText, taskSummary, taskReady ? "#237A3B" : hasSelection ? "#936400" : "#637083");
+        ToolTip.SetTip(TaskCheckText, !hasSelection
+            ? "选择任务后查看详细映射资格。"
+            : string.Join(Environment.NewLine, selectedAssessment?.Directories.Select(directory => $"{directory.RelativePath}：{directory.Reason}") ?? []));
 
         var ready = !parentBlocked && taskReady;
         ActionHintText.Text = _busy
             ? "正在执行操作…"
             : damaged
-                ? "下一步：点击“修复父级工作副本”，清理中断的 SVN 排除状态。"
+                ? "下一步：修复父目录"
             : !hasSelection
-                ? "下一步：选择一个任务查看映射资格。"
+                ? "下一步：选择任务"
             : !taskReady
-                ? "下一步：点击任务右侧的刷新图标，把任务更新到 trunk 目录的最新变更。"
+                ? "下一步：更新任务"
             : parentBlocked
-                ? "任务本身已就绪，不需要更新；下一步：处理父目录中已跟踪的修改或冲突，之后即可进入映射。"
+                ? "下一步：处理父目录"
             : !parentClean
-                ? "下一步：点击任务右侧的迁移图标，把未版本化或忽略内容移入任务并进入映射。"
-            : "下一步：点击任务右侧的进入图标，进入任务映射。";
+                ? "下一步：迁移文件"
+            : "下一步：进入映射";
         ActionHintText.Foreground = new SolidColorBrush(Color.Parse(parentBlocked ? "#2C7A4B" : ready ? "#237A3B" : "#637083"));
 
         WorkspaceStateText.Text = _busy
@@ -607,12 +625,12 @@ public partial class MainWindow : Window
         if (state.Mode == WorkspaceMode.TaskMapping)
         {
             DirectoryStatusList.ItemsSource = (_restoreAssessment?.Directories ?? []).Select(DirectoryStatusItem.FromRestore).ToList();
-            DirectoryHintText.Text = "绿色表示可以把该目录安全恢复到原目录；黄色或红色表示还需要先处理映射、revision 或工作副本状态。";
+            DirectoryHintText.Text = "恢复状态";
             return;
         }
 
         DirectoryStatusList.ItemsSource = _isolationDirectories.Select(DirectoryStatusItem.FromNormal).ToList();
-        DirectoryHintText.Text = "普通模式下显示每个隔离目录的位置、revision 和未提交内容。进入映射后，这里会显示任务 revision 与恢复目标。";
+        DirectoryHintText.Text = "隔离目录状态";
     }
 
     private static void SetCheck(TextBlock block, string text, string color)
