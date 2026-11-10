@@ -75,7 +75,7 @@
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
           <Button Name="RefreshButton" Content="刷新状态" Click="RefreshStatusClick" />
-          <Button Name="UpdateButton" Classes="primary" Content="更新工作区" Click="UpdateClick" />
+          <Button Name="UpdateButton" Classes="primary" Content="更新项目 SVN" Click="UpdateClick" />
         </StackPanel>
         <TextBlock Name="ProjectPathText" Grid.Row="1" Text="项目根目录：正在读取…" Foreground="#637083" Margin="0,10,0,0" />
         <TextBlock Name="CurrentTaskText" Grid.Row="1" Grid.Column="1" Text="当前任务：无" Foreground="#637083" Margin="18,10,0,0" />
@@ -97,8 +97,10 @@
                     <TextBlock Text="{Binding DisplayName}" Foreground="{Binding Foreground}" FontWeight="{Binding DisplayWeight}" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Row="1" Text="{Binding StatusText}" Foreground="{Binding Foreground}" FontSize="11" TextTrimming="CharacterEllipsis" />
                     <StackPanel Grid.Column="1" Grid.RowSpan="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                      <Button Classes="icon" Foreground="{Binding ActionForeground}" Content="{Binding UseGlyph}" Tag="{Binding Name}" Click="TaskItemUseClick" IsEnabled="{Binding CanUse}" ToolTip.Tip="{Binding UseToolTip}" ToolTip.ShowOnDisabled="True" />
-                      <Button Classes="icon danger-icon" Foreground="#B42318" Content="&#xE74D;" Tag="{Binding Name}" Click="TaskItemDeleteClick" IsEnabled="{Binding CanDelete}" ToolTip.Tip="删除任务（移入回收站）" ToolTip.ShowOnDisabled="True" />
+                      <Button Classes="icon" Foreground="#1557A6" Content="&#xE8B5;" Tag="{Binding Name}" Click="TaskItemSyncClick" IsVisible="{Binding CanSync}" ToolTip.Tip="{Binding SyncToolTip}" />
+                      <Button Classes="icon" Foreground="#5A6B84" Content="&#xE8AC;" Tag="{Binding Name}" Click="TaskItemExitMappingClick" IsVisible="{Binding CanExitMapping}" ToolTip.Tip="退出映射" />
+                      <Button Classes="icon" Foreground="{Binding ActionForeground}" Content="{Binding UseGlyph}" Tag="{Binding Name}" Click="TaskItemUseClick" IsVisible="{Binding CanUse}" ToolTip.Tip="{Binding UseToolTip}" />
+                      <Button Classes="icon danger-icon" Foreground="#B42318" Content="&#xE74D;" Tag="{Binding Name}" Click="TaskItemDeleteClick" IsVisible="{Binding CanDelete}" ToolTip.Tip="删除任务（移入回收站）" />
                       <Button Classes="icon" Content="&#xE712;" Tag="{Binding Name}" Click="TaskItemMoreClick" ToolTip.Tip="更多任务操作" />
                     </StackPanel>
                   </Grid>
@@ -113,58 +115,48 @@
         </Grid>
       </Border>
 
-      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
+      <Grid Grid.Column="1" RowDefinitions="*">
         <Border Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="12" Padding="16">
-          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="2">
-            <TextBlock Text="当前工作区" FontSize="19" FontWeight="SemiBold" Foreground="#20242B" />
+          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2">
+            <TextBlock Text="当前目录" FontSize="19" FontWeight="SemiBold" Foreground="#20242B" />
             <Border Name="WorkspaceStateBadge" Grid.Column="1" Background="#EEF1F6" CornerRadius="10" Padding="10,3" VerticalAlignment="Center">
               <TextBlock Name="WorkspaceStateText" Text="检查中…" FontSize="12" FontWeight="SemiBold" Foreground="#637083" />
             </Border>
-            <TextBlock Name="WorkspacePathText" Grid.Row="1" Text="工作区：普通模式" Foreground="#637083" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-            <TextBlock Name="PublicStatusText" Grid.Row="1" Grid.Column="1" Text="公共工作区：待检查" Foreground="#637083" Margin="16,8,0,0" />
+            <TextBlock Name="WorkspacePathText" Grid.Row="1" Text="目录映射：检查中…" Foreground="#637083" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+              <TextBlock Name="PublicStatusText" Grid.Row="1" Grid.Column="1" Text="项目 SVN：待检查" Foreground="#637083" Margin="16,8,0,0" />
             <StackPanel Name="ReadinessPanel" Grid.Row="2" Grid.ColumnSpan="2" Spacing="3" Margin="0,10,0,0">
-              <TextBlock Name="ParentCheckText" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="父目录：正在检查…" />
-              <TextBlock Name="TaskCheckText" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="任务：请先选择" />
-              <TextBlock Name="ActionHintText" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="" />
+              <TextBlock Name="ParentCheckText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="父目录：正在检查…" />
+              <TextBlock Name="TaskCheckText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="任务：请先选择" />
+              <TextBlock Name="ActionHintText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="" />
               <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
-                <Button Name="MigrateCurrentButton" Content="从当前修改进入映射" Click="MigrateCurrentChangesClick" IsVisible="False" ToolTip.Tip="把隔离目录里的已跟踪修改和未版本化文件迁移到新任务，并进入映射" />
+                <Button Name="MigrateCurrentButton" Content="从当前修改进入映射" Click="MigrateCurrentChangesClick" IsVisible="False" ToolTip.Tip="把任务映射目录里的已跟踪修改和未版本化文件迁移到新任务，并进入映射" />
                 <Button Name="RepairWorkingCopyButton" Content="修复父级工作副本" Click="RepairWorkingCopyClick" IsVisible="False" Background="#FFF4D6" BorderBrush="#E0B84A" ToolTip.Tip="仅修复因进入映射中断而处于 Schedule: delete 的父级目录，保留未版本化和忽略文件" />
+                <Button Name="RestoreButton" Content="退出映射并同步目录" Click="RestoreCurrentTaskClick" IsVisible="False" IsEnabled="False" ToolTip.ShowOnDisabled="True" />
               </StackPanel>
+              <TextBlock Name="RestoreStatusText" IsVisible="False" Foreground="#936400" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
+            <Border Grid.Row="3" Grid.ColumnSpan="2" Background="#F8FAFD" BorderBrush="#E3E8F0" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,8,0,0">
+              <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
+                <TextBlock Name="DirectoryHintText" IsVisible="False" Grid.Row="1" Text="正在读取任务映射目录状态…" Foreground="#637083" TextWrapping="Wrap" />
+                <ListBox Name="DirectoryStatusList" Grid.Row="2" Background="Transparent" BorderThickness="0" MinHeight="60" MaxHeight="280">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Background="{Binding Background}" CornerRadius="8" Padding="10" Margin="0,2" ToolTip.Tip="{Binding DetailText}">
+                        <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
+                          <TextBlock Text="{Binding RelativePath}" Foreground="#20242B" FontWeight="SemiBold" />
+                          <TextBlock Grid.Column="1" Text="{Binding StateText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" />
+                          <TextBlock Grid.Row="1" Text="{Binding TargetText}" IsVisible="{Binding HasTarget}" Foreground="#637083" FontSize="12" TextTrimming="CharacterEllipsis" />
+                          <Button Grid.Column="2" Grid.RowSpan="2" Content="打开目录" Tag="{Binding RelativePath}" Click="OpenIsolationDirectoryClick" VerticalAlignment="Center" Margin="10,0,0,0" Padding="8,4" FontSize="12" ToolTip.Tip="在文件资源管理器中打开这个项目目录" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </Grid>
+            </Border>
           </Grid>
         </Border>
 
-        <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="12" Padding="16" VerticalAlignment="Top">
-          <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-              <TextBlock Text="隔离目录映射" FontSize="19" FontWeight="SemiBold" Foreground="#20242B" />
-              <TextBlock Text="原目录与任务目录的关系" VerticalAlignment="Center" Foreground="#7A8494" FontSize="12" />
-            </StackPanel>
-            <TextBlock Name="DirectoryHintText" Grid.Row="1" Text="隔离目录状态：正在读取…" Foreground="#637083" TextWrapping="Wrap" />
-            <ListBox Name="DirectoryStatusList" Grid.Row="2" Background="Transparent" BorderThickness="0" MinHeight="60" MaxHeight="320">
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <Border Background="{Binding Background}" CornerRadius="8" Padding="12" Margin="0,3" ToolTip.Tip="{Binding DetailText}">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                      <TextBlock Text="{Binding RelativePath}" Foreground="#20242B" FontWeight="SemiBold" />
-                      <TextBlock Grid.Column="1" Text="{Binding StateText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" />
-                      <TextBlock Grid.Row="1" Text="{Binding RevisionText}" Foreground="#637083" FontSize="12" />
-                      <TextBlock Grid.Row="1" Grid.Column="1" Text="" Foreground="#637083" FontSize="12" />
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </Grid>
-        </Border>
-
-        <Border Name="RestoreCard" Grid.Row="2" Background="#FFF4D6" CornerRadius="12" Padding="16">
-          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-            <TextBlock Name="RestoreStatusText" Text="正在检查是否可以恢复到原目录…" FontSize="18" FontWeight="SemiBold" Foreground="#20242B" />
-            <Button Name="RestoreButton" Grid.Column="1" Grid.RowSpan="2" Content="恢复到原目录并退出任务映射" Click="RestoreCurrentTaskClick" IsVisible="False" IsEnabled="False" VerticalAlignment="Center" />
-            <TextBlock Name="RevisionStatusText" Grid.Row="1" Text="" Foreground="#637083" TextWrapping="Wrap" Margin="0,6,12,0" />
-          </Grid>
-        </Border>
       </Grid>
     </Grid>
 
@@ -179,7 +171,7 @@
           <TextBox Name="StatusText" Grid.Row="1" Grid.ColumnSpan="2" Text="正在加载..." Foreground="#20242B" Background="Transparent" BorderThickness="0" Padding="0" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="150" />
         </Grid>
       </Border>
-      <Expander Name="SettingsExpander" Grid.Row="1" Header="配置（项目、任务根目录和隔离目录）" Foreground="#425066">
+      <Expander Name="SettingsExpander" Grid.Row="1" Header="配置（项目、任务根目录和任务映射目录）" Foreground="#425066">
         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="7" Margin="4,10,4,2">
           <TextBlock Text="项目根目录" VerticalAlignment="Center" />
           <TextBox Name="ProjectRootBox" Grid.Column="1" />
@@ -187,7 +179,7 @@
           <TextBox Name="TaskRootBox" Grid.Row="1" Grid.Column="1" />
           <TextBlock Text="SVN trunk URL" Grid.Row="2" VerticalAlignment="Center" />
           <TextBox Name="SvnUrlBox" Grid.Row="2" Grid.Column="1" />
-          <TextBlock Text="隔离目录（每行一个相对路径）" Grid.Row="3" VerticalAlignment="Center" />
+          <TextBlock Text="任务映射目录（每行一个相对路径）" Grid.Row="3" VerticalAlignment="Center" />
           <TextBox Name="IsolatedDirectoriesBox" Grid.Row="3" Grid.Column="1" AcceptsReturn="True" MinHeight="58" />
           <Button Content="保存配置" Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left" Click="SaveConfigurationClick" />
         </Grid>

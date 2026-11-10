@@ -71,7 +71,7 @@ public sealed partial class WorkspaceService
     private async Task<int> ReadDirectParentRevisionAsync(string projectPath, CancellationToken cancellationToken)
     {
         var parent = Directory.GetParent(projectPath)?.FullName
-            ?? throw new InvalidOperationException($"无法确定隔离目录的直接父目录：{projectPath}");
+            ?? throw new InvalidOperationException($"无法确定任务映射目录的直接父目录：{projectPath}");
         var info = await _svn.WorkingCopyInfoAsync(parent, cancellationToken);
         return info.Info?.Revision
             ?? throw new InvalidOperationException($"无法读取外层目录 {parent} 的 SVN revision：{info.Result.StandardError}");

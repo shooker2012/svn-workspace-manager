@@ -21,14 +21,14 @@ public sealed partial class WorkspaceService
             foreach (var relativePath in _configuration.IsolatedDirectories)
             {
                 var source = _guard.ProjectPath(relativePath);
-                if (!Directory.Exists(source)) throw new DirectoryNotFoundException($"隔离目录不存在：{source}");
-                if (_junctions.IsJunction(source)) throw new InvalidOperationException($"隔离目录 {relativePath} 已经处于任务映射状态。");
+                if (!Directory.Exists(source)) throw new DirectoryNotFoundException($"任务映射目录不存在：{source}");
+                if (_junctions.IsJunction(source)) throw new InvalidOperationException($"任务映射目录 {relativePath} 已经处于任务映射状态。");
 
                 var status = await _svn.StatusIncludingUnversionedAsync(source, cancellationToken);
                 if (!status.Succeeded) throw new InvalidOperationException($"无法读取 {relativePath} 的 SVN 状态：{status.StandardError}");
                 var entries = SvnStatusParser.Parse(status.StandardOutput, Path.GetDirectoryName(source)!);
                 if (entries.Any(entry => entry.HasBlockingFlag))
-                    throw new InvalidOperationException($"隔离目录 {relativePath} 存在冲突、缺失、目录受阻或锁定，不能迁移。");
+                    throw new InvalidOperationException($"任务映射目录 {relativePath} 存在冲突、缺失、目录受阻或锁定，不能迁移。");
 
                 if (entries.Any(entry => entry.Code is not ('?' or 'I')))
                 {

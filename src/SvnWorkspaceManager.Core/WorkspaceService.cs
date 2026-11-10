@@ -192,9 +192,9 @@ public sealed partial class WorkspaceService
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(_guard.ProjectPath)
             .ToList();
-        if (directories.Count == 0) throw new InvalidOperationException("至少需要配置一个隔离目录。");
+        if (directories.Count == 0) throw new InvalidOperationException("至少需要配置一个任务映射目录。");
         if (directories.Distinct(StringComparer.OrdinalIgnoreCase).Count() != directories.Count)
-            throw new InvalidOperationException("隔离目录不能重复。");
+            throw new InvalidOperationException("任务映射目录不能重复。");
         for (var index = 0; index < directories.Count; index++)
         {
             for (var other = index + 1; other < directories.Count; other++)
@@ -203,7 +203,7 @@ public sealed partial class WorkspaceService
                 var second = directories[other];
                 if (first.StartsWith(second + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
                     || second.StartsWith(first + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException($"隔离目录不能互相包含：{first} 与 {second}");
+                    throw new InvalidOperationException($"任务映射目录不能互相包含：{first} 与 {second}");
             }
         }
     }

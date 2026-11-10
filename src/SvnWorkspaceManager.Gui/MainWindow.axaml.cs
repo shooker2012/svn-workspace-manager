@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private IReadOnlyList<IsolationDirectorySnapshot> _isolationDirectories = [];
     private RestoreAssessment? _restoreAssessment;
     private bool _initialized;
+    private bool _mappingInconsistent;
 
     public MainWindow()
     {
@@ -90,13 +91,13 @@ public partial class MainWindow : Window
         IsolatedDirectoriesBox.Text = string.Join(Environment.NewLine, configuration.IsolatedDirectories);
         ProjectPathText.Text = $"项目根目录：{configuration.ProjectRoot}";
         CurrentTaskText.Text = $"当前任务：{state.ActiveTask ?? "无"}";
-        WorkspacePathText.Text = "任务路径：无";
-        PublicStatusText.Text = "公共工作区状态：正在检查…";
+        WorkspacePathText.Text = "目录映射：检查中…";
+        PublicStatusText.Text = "项目 SVN：正在检查…";
         SetValidity(ProjectRootBox, Directory.Exists(configuration.ProjectRoot));
         SetValidity(TaskRootBox, Directory.Exists(configuration.TaskRoot));
         SetValidity(SvnUrlBox, !string.IsNullOrWhiteSpace(configuration.SvnTrunkUrl));
         SetValidity(IsolatedDirectoriesBox, configuration.IsolatedDirectories.Count > 0 && configuration.IsolatedDirectories.All(IsSafeRelativePath));
-        ModeText.Text = state.Mode == WorkspaceMode.Normal ? "普通模式" : $"任务映射模式：{state.ActiveTask}";
+        ModeText.Text = state.Mode == WorkspaceMode.Normal ? "普通模式" : $"目录映射：{state.ActiveTask}";
         var tasks = _store.ListTasks().OrderBy(task => task.Name).ToList();
         var taskAssessments = new Dictionary<string, TaskMappingAssessment>(StringComparer.OrdinalIgnoreCase);
         var checks = tasks.Select(async task =>
@@ -121,8 +122,8 @@ public partial class MainWindow : Window
             ? null
             : _store.ListTasks().FirstOrDefault(task => string.Equals(task.Name, state.ActiveTask, StringComparison.OrdinalIgnoreCase));
         WorkspacePathText.Text = state.Mode == WorkspaceMode.TaskMapping
-            ? $"工作区：映射 · {activeTask?.Name ?? state.ActiveTask ?? "未知任务"}"
-            : "工作区：普通模式";
+            ? $"目录映射：{activeTask?.Name ?? state.ActiveTask ?? "未知任务"}"
+            : "目录映射：未启用";
         ToolTip.SetTip(WorkspacePathText, state.Mode == WorkspaceMode.TaskMapping
             ? activeTask?.RootPath ?? configuration.ProjectRoot
             : configuration.ProjectRoot);
@@ -130,13 +131,29 @@ public partial class MainWindow : Window
         var assessment = snapshot.RestoreAssessment;
         _restoreAssessment = assessment;
         _isolationDirectories = snapshot.IsolationDirectories;
-        PublicStatusText.Text = snapshot.ProjectStatus.Succeeded ? "公共工作区：正常" : "公共工作区：读取失败";
+        _mappingInconsistent = HasInconsistentMapping(state, _isolationDirectories);
+        PublicStatusText.Text = snapshot.ProjectStatus.Succeeded ? "项目 SVN：正常" : "项目 SVN：读取失败";
+
+        ToolTip.SetTip(UpdateButton, "更新项目 SVN；任务映射模式下同时更新当前任务");
         ToolTip.SetTip(PublicStatusText, snapshot.ProjectStatus.Succeeded
-            ? "公共工作区 SVN 状态读取成功。"
+            ? "项目根目录的 SVN 工作副本状态读取成功。"
             : snapshot.ProjectStatus.StandardError.Trim());
         var parentStatus = GetParentWorkspaceStatus();
         var taskItems = TaskListOrdering.OrderForDisplay(
-                tasks.Select(task => new TaskListItem(task, IsTaskValid(task, configuration), taskAssessments[task.Name], state.ActiveTask, parentStatus, state.Mode)),
+                tasks.Select(task => new TaskListItem(task, IsTaskValid(task, configuration), taskAssessments[task.Name], state.ActiveTask, parentStatus, state.Mode)
+                {
+                    CanSync = state.Mode == WorkspaceMode.TaskMapping
+                        && string.Equals(task.Name, state.ActiveTask, StringComparison.OrdinalIgnoreCase)
+                        && assessment.IsReady && state.RestoreOperation is null,
+                    CanExitMapping = state.Mode == WorkspaceMode.TaskMapping
+                        && string.Equals(task.Name, state.ActiveTask, StringComparison.OrdinalIgnoreCase)
+                        && !_mappingInconsistent && state.RestoreOperation is null,
+                    SyncToolTip = state.Mode == WorkspaceMode.TaskMapping
+                        && string.Equals(task.Name, state.ActiveTask, StringComparison.OrdinalIgnoreCase)
+                        && assessment.IsReady && state.RestoreOperation is null
+                        ? "退出映射并同步目录"
+                        : $"退出映射并同步目录：{(state.RestoreOperation is not null ? "请先继续未完成的操作" : assessment.Summary)}"
+                }),
                 item => item.Status,
                 item => item.Name)
             .ToList();
@@ -149,31 +166,26 @@ public partial class MainWindow : Window
         UpdateActionAvailability();
         var interrupted = state.RestoreOperation;
         RestoreButton.IsEnabled = assessment.IsReady || interrupted is not null;
-        RestoreButton.IsVisible = assessment.IsReady || interrupted is not null;
+        RestoreButton.IsVisible = interrupted is not null;
         RestoreButton.Content = interrupted is null
-            ? "恢复到原目录并退出任务映射"
+            ? "退出映射并同步目录"
             : interrupted.Kind switch
             {
                 WorkspaceOperationKinds.Exit => "继续退出任务映射",
                 WorkspaceOperationKinds.RollbackMapping => "继续回滚进入操作",
                 _ => "继续恢复到原目录"
             };
-        RestoreCard.IsVisible = state.Mode == WorkspaceMode.TaskMapping || interrupted is not null;
-        RestoreCard.Background = new SolidColorBrush(Color.Parse(assessment.IsReady ? "#DFF5E3" : state.Mode == WorkspaceMode.TaskMapping ? "#FFE1E1" : "#FFF4D6"));
+        RestoreStatusText.IsVisible = interrupted is not null || (state.Mode == WorkspaceMode.TaskMapping && !assessment.IsReady);
         RestoreStatusText.Text = interrupted is not null
-            ? $"! 上次操作未完成：{interrupted.Phase}"
-            : assessment.IsReady ? "● 可以恢复到原目录" : state.Mode == WorkspaceMode.TaskMapping ? "! 不能恢复到原目录" : "— 当前不是任务映射模式";
-        RevisionStatusText.Text = interrupted is not null
-            ? "上次操作未完成，点击右侧按钮继续"
-            : assessment.IsReady ? "所有隔离目录均满足恢复条件" : "当前不可恢复";
-        ToolTip.SetTip(RevisionStatusText, interrupted is not null
-            ? $"{interrupted.Kind} / {interrupted.Phase} / {interrupted.CurrentDirectory ?? "无"}{Environment.NewLine}{(string.IsNullOrWhiteSpace(interrupted.Error) ? "点击右侧按钮继续。" : interrupted.Error)}"
-            : assessment.Directories.Count == 0
-                ? "进入任务映射模式后，这里会显示任务 svnversion 和恢复目标。"
-                : string.Join(Environment.NewLine, assessment.Directories.Select(directory =>
-                    $"{directory.RelativePath}：任务工作副本 {(directory.TaskRevision is null ? "未知" : $"r{directory.TaskRevision}")} / 恢复目标 {(directory.TargetRevision is null ? "未知" : $"r{directory.TargetRevision}")} — {directory.Reason}")));
+            ? $"上次操作未完成：{interrupted.Phase}"
+            : assessment.Summary;
+        ToolTip.SetTip(RestoreButton, interrupted is not null
+            ? interrupted.Error ?? "继续上次未完成的操作。"
+            : assessment.IsReady
+                ? "将任务内容同步回项目目录并退出映射，任务工作区保留。"
+                : assessment.Summary);
         if (MessageTitle.Text != "操作失败")
-            SetMessage($"状态已刷新：{assessment.Summary}");
+            SetMessage(state.Mode == WorkspaceMode.Normal && interrupted is null ? "状态已刷新。" : $"状态已刷新：{assessment.Summary}");
         }
         catch (OperationCanceledException)
         {
@@ -185,7 +197,7 @@ public partial class MainWindow : Window
             RestoreButton.IsEnabled = false;
             RestoreButton.IsVisible = false;
             RestoreStatusText.Text = "! 状态检查失败";
-            RevisionStatusText.Text = exception.Message;
+            RestoreStatusText.IsVisible = true;
             SetMessage(exception.Message, true);
         }
     }
@@ -287,7 +299,7 @@ public partial class MainWindow : Window
             Children =
             {
                 new TextBlock { Text = "从当前原目录创建任务", FontSize = 20, FontWeight = FontWeight.SemiBold },
-                new TextBlock { Text = "会把隔离目录中的修改、未版本化和忽略文件迁移到新任务，并立即进入任务映射模式。", TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.Parse("#637083")) },
+                new TextBlock { Text = "会把任务映射目录中的修改、未版本化和忽略文件迁移到新任务，并立即进入任务映射模式。", TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.Parse("#637083")) },
                 nameBox,
                 buttons
             }
@@ -345,7 +357,7 @@ public partial class MainWindow : Window
                 TaskList.SelectedItem = item;
                 var blocked = _isolationDirectories.Where(directory => !directory.IsClean).ToList();
                 var description = blocked.Count == 0
-                    ? "父级隔离目录状态尚未读取完成。"
+                    ? "父级任务映射目录状态尚未读取完成。"
                     : string.Join("；", blocked.Select(DescribeIsolationProblem));
                 var hint = blocked.Any(directory => !directory.Exists || directory.IsJunction || directory.Error is not null)
                     ? "可在“当前工作区”卡片点击“修复父级工作副本”。"
@@ -354,7 +366,7 @@ public partial class MainWindow : Window
                 return;
             }
             case TaskListStatus.NeedsMigration:
-                if (!await ConfirmAsync("确认迁移本地文件", $"隔离目录中有未版本化或忽略内容。进入映射前会把这些内容迁移到任务“{task}”，随后原目录将映射到该任务。是否继续？", "迁移并进入映射")) return;
+                if (!await ConfirmAsync("确认迁移本地文件", $"任务映射目录中有未版本化或忽略内容。进入映射前会把这些内容迁移到任务“{task}”，随后原目录将映射到该任务。是否继续？", "迁移并进入映射")) return;
                 await RunActionAsync($"迁移本地文件并进入映射 {task}", token => _service.EnableTaskMappingWithUnversionedChangesAsync(task, token));
                 return;
             case TaskListStatus.Ready:
@@ -453,7 +465,16 @@ public partial class MainWindow : Window
                     RunActionAsync($"更新任务 {task}", token => _service.UpdateTaskAsync(task, token))));
         }
         if (isActive)
-            flyout.Items.Add(CreateTaskMenuItem("\uE72B", "退出任务映射（保留工作区）", ExitTaskMappingAsync));
+        {
+            flyout.Items.Add(CreateTaskMenuItem("\uE8AC", "退出映射", ExitTaskMappingAsync));
+            var syncItem = CreateTaskMenuItem("\uE8B5", "退出映射并同步目录", RestoreCurrentTaskAsync);
+            syncItem.IsEnabled = !_busy && !_refreshing && state.RestoreOperation is null && _restoreAssessment?.IsReady == true;
+            ToolTip.SetTip(syncItem, _restoreAssessment?.IsReady == true
+                ? "将当前任务内容同步回项目目录，任务工作区保留。"
+                : _restoreAssessment?.Summary ?? "正在检查同步条件。");
+            ToolTip.SetShowOnDisabled(syncItem, true);
+            flyout.Items.Add(syncItem);
+        }
 
         if (!isActive)
         {
@@ -542,12 +563,17 @@ public partial class MainWindow : Window
 
     private void UpdateReadiness(WorkspaceState state, string? selected, TaskMappingAssessment? selectedAssessment, bool isMapping)
     {
-        ReadinessPanel.IsVisible = !isMapping;
+        ReadinessPanel.IsVisible = true;
         if (isMapping)
         {
-            WorkspaceStateText.Text = string.IsNullOrWhiteSpace(state.ActiveTask) ? "任务映射" : $"任务映射 · {state.ActiveTask}";
-            WorkspaceStateBadge.Background = new SolidColorBrush(Color.Parse("#DCEBFF"));
-            WorkspaceStateText.Foreground = new SolidColorBrush(Color.Parse("#1557A6"));
+            WorkspaceStateText.Text = _mappingInconsistent
+                ? "映射异常"
+                : string.IsNullOrWhiteSpace(state.ActiveTask) ? "目录映射已启用" : $"目录映射 · {state.ActiveTask}";
+            WorkspaceStateBadge.Background = new SolidColorBrush(Color.Parse(_mappingInconsistent ? "#FFE1E1" : "#DCEBFF"));
+            WorkspaceStateText.Foreground = new SolidColorBrush(Color.Parse(_mappingInconsistent ? "#B42318" : "#1557A6"));
+            ToolTip.SetTip(WorkspaceStateText, _mappingInconsistent
+                ? "保存的活动任务与项目目录中的实际 junction 不一致，请先刷新或修复目录映射。"
+                : "项目目录中的任务映射目录当前通过 junction 指向活动任务。 ");
             return;
         }
 
@@ -569,7 +595,7 @@ public partial class MainWindow : Window
                             : "父目录：有待迁移文件";
         SetCheck(ParentCheckText, parentSummary, parentClean ? "#237A3B" : parentDamaged ? "#936400" : "#2C7A4B");
         ToolTip.SetTip(ParentCheckText, _isolationDirectories.Count == 0
-            ? "尚未配置隔离目录。"
+            ? "尚未配置任务映射目录。"
             : parentClean
                 ? string.Join("、", _isolationDirectories.Select(directory => $"{directory.RelativePath} r{directory.Revision}"))
                 : string.Join("；", problems.Select(DescribeIsolationProblem)));
@@ -607,30 +633,50 @@ public partial class MainWindow : Window
 
         WorkspaceStateText.Text = _busy
             ? "执行中…"
-            : taskReady && parentBlocked
-                ? "● 任务已就绪 · 先清理父目录"
-                : taskReady && parentClean
-                    ? "● 可进入映射"
-                    : taskReady
-                        ? "● 任务已就绪 · 可迁移后进入"
-                        : hasSelection ? "⚠ 任务需更新" : "⚠ 存在阻塞";
+            : _mappingInconsistent
+                ? "映射异常"
+            : parentClean ? "● 普通目录"
+            : parentDamaged ? "⚠ 目录状态异常"
+            : _isolationDirectories.Count == 0 ? "未配置目录"
+            : "普通目录 · 有本地修改";
         WorkspaceStateBadge.Background = new SolidColorBrush(Color.Parse(
-            taskReady && parentClean ? "#DFF5E3" : taskReady ? "#E6F5EA" : "#FFF4D6"));
+            _mappingInconsistent ? "#FFE1E1" : parentClean ? "#DFF5E3" : "#FFF4D6"));
         WorkspaceStateText.Foreground = new SolidColorBrush(Color.Parse(
-            taskReady && parentClean ? "#237A3B" : taskReady ? "#2C7A4B" : "#936400"));
+            _mappingInconsistent ? "#B42318" : parentClean ? "#237A3B" : "#936400"));
+        ToolTip.SetTip(WorkspaceStateText, _mappingInconsistent
+            ? "普通模式下仍发现 junction，或实际目录映射与保存状态不一致。"
+            : "当前项目目录没有启用任务 junction。 ");
     }
 
     private void RenderIsolationDirectories(WorkspaceState state)
     {
+        DirectoryHintText.IsVisible = _mappingInconsistent;
         if (state.Mode == WorkspaceMode.TaskMapping)
         {
-            DirectoryStatusList.ItemsSource = (_restoreAssessment?.Directories ?? []).Select(DirectoryStatusItem.FromRestore).ToList();
-            DirectoryHintText.Text = "恢复状态";
+            DirectoryStatusList.ItemsSource = _isolationDirectories.Select(DirectoryStatusItem.FromNormal).ToList();
+            DirectoryHintText.Text = _mappingInconsistent ? "发现目录映射异常，请检查下面的实际目标" : "当前每个项目目录的实际 junction 目标";
             return;
         }
 
         DirectoryStatusList.ItemsSource = _isolationDirectories.Select(DirectoryStatusItem.FromNormal).ToList();
-        DirectoryHintText.Text = "隔离目录状态";
+        DirectoryHintText.Text = _mappingInconsistent ? "发现目录映射异常，请检查下面的实际目标" : "当前每个项目目录的实际状态";
+    }
+
+    private static bool HasInconsistentMapping(WorkspaceState state, IReadOnlyList<IsolationDirectorySnapshot> directories)
+    {
+        if (directories.Count == 0) return false;
+        var linked = directories.Where(directory => directory.IsJunction).ToList();
+        if (state.Mode == WorkspaceMode.Normal) return linked.Count > 0;
+        if (string.IsNullOrWhiteSpace(state.ActiveTask) || linked.Count != directories.Count) return true;
+        return linked.Any(directory => !TargetBelongsToTask(directory.LinkTarget, state.ActiveTask));
+    }
+
+    private static bool TargetBelongsToTask(string? targetPath, string taskName)
+    {
+        if (string.IsNullOrWhiteSpace(targetPath)) return false;
+        var normalized = Path.GetFullPath(targetPath).TrimEnd(Path.DirectorySeparatorChar);
+        var marker = Path.DirectorySeparatorChar + taskName + Path.DirectorySeparatorChar;
+        return normalized.Contains(marker, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void SetCheck(TextBlock block, string text, string color)
@@ -663,11 +709,35 @@ public partial class MainWindow : Window
 
     private async Task ExitTaskMappingAsync()
     {
-        if (!await ConfirmAsync("确认退出任务映射", "将移除原目录中的 junction，并把每个隔离目录恢复到其直接父目录当前的 SVN revision。任务内容不会复制回原目录，任务工作区会保留。是否继续？", "确认退出任务映射")) return;
+        if (!await ConfirmAsync("确认退出任务映射", "将移除原目录中的 junction，并把每个任务映射目录恢复到其直接父目录当前的 SVN revision。任务内容不会复制回原目录，任务工作区会保留。是否继续？", "确认退出任务映射")) return;
         await RunActionAsync("退出任务映射", token => _service.ExitTaskMappingAsync(token));
     }
 
-    private async void RestoreCurrentTaskClick(object? sender, RoutedEventArgs e)
+    private async void ExitMappingClick(object? sender, RoutedEventArgs e) => await ExitTaskMappingAsync();
+
+    private async void RestoreCurrentTaskClick(object? sender, RoutedEventArgs e) => await RestoreCurrentTaskAsync();
+
+    private async void TaskItemSyncClick(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || _refreshing || sender is not Button { Tag: string task }) return;
+        var state = _store.LoadState();
+        if (state.Mode != WorkspaceMode.TaskMapping ||
+            !string.Equals(task, state.ActiveTask, StringComparison.OrdinalIgnoreCase) ||
+            state.RestoreOperation is not null || _restoreAssessment?.IsReady != true) return;
+        await RestoreCurrentTaskAsync();
+    }
+
+    private async void TaskItemExitMappingClick(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || _refreshing || sender is not Button { Tag: string task }) return;
+        var state = _store.LoadState();
+        if (state.Mode != WorkspaceMode.TaskMapping ||
+            !string.Equals(task, state.ActiveTask, StringComparison.OrdinalIgnoreCase) ||
+            state.RestoreOperation is not null || _mappingInconsistent) return;
+        await ExitTaskMappingAsync();
+    }
+
+    private async Task RestoreCurrentTaskAsync()
     {
         var state = _store.LoadState();
         if (state.RestoreOperation is not null)
@@ -676,7 +746,7 @@ public partial class MainWindow : Window
             await RunActionAsync("继续未完成的操作", token => _service.ResumeInterruptedOperationAsync(token));
             return;
         }
-        if (!await ConfirmAsync("确认恢复到原目录", "将把任务内容（包括未版本化文件）同步到原目录，并把每个父目录对齐到任务 revision，然后退出任务映射模式。任务工作区会保留。是否继续？", "确认恢复")) return;
+        if (!await ConfirmAsync("确认退出映射并同步目录", "将把任务内容（包括未版本化文件）同步到原目录，并把每个父目录对齐到任务 revision，然后退出任务映射模式。任务工作区会保留。是否继续？", "确认同步")) return;
         await RunActionAsync("恢复到原目录", token => _service.RestoreCurrentTaskToProjectAsync(token));
     }
 
@@ -783,6 +853,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OpenIsolationDirectoryClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string relativePath }) return;
+
+        var directoryPath = Path.GetFullPath(Path.Combine(_configuration.ProjectRoot, relativePath));
+        try
+        {
+            if (!Directory.Exists(directoryPath))
+            {
+                SetMessage($"目录不存在：{directoryPath}", true);
+                return;
+            }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{directoryPath}\"")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            SetMessage($"无法打开目录：{exception.Message}（目录：{directoryPath}）", true);
+        }
+    }
+
     private void UpdateActionAvailabilitySafe()
     {
         try
@@ -830,7 +924,7 @@ public partial class MainWindow : Window
             if (!Directory.Exists(configuration.ProjectRoot)) throw new DirectoryNotFoundException($"项目根目录不存在：{configuration.ProjectRoot}");
             if (string.IsNullOrWhiteSpace(configuration.TaskRoot)) throw new InvalidOperationException("任务根目录不能为空。");
             if (configuration.IsolatedDirectories.Count == 0 || configuration.IsolatedDirectories.Any(path => !IsSafeRelativePath(path)))
-                throw new InvalidOperationException("隔离目录必须是项目根目录内的相对路径。");
+                throw new InvalidOperationException("任务映射目录必须是项目根目录内的相对路径。");
             _store.SaveConfiguration(configuration);
             _configuration = configuration;
             _service = CreateService(configuration, _logger);
@@ -937,7 +1031,7 @@ public sealed class TaskListItem
         StatusText = Status switch
         {
             TaskListStatus.CurrentTask => "◆ 映射中",
-            TaskListStatus.Ready => "● 可进入映射",
+            TaskListStatus.Ready => "● 就绪",
             TaskListStatus.ParentBlocked => "● 任务已就绪 · 先清理父目录",
             TaskListStatus.NeedsMigration => "● 任务已就绪 · 需迁移本地文件",
             TaskListStatus.NeedsConflict => "⚠ 需处理冲突",
@@ -967,6 +1061,9 @@ public sealed class TaskListItem
     public string DisplayName { get; }
     public bool CanUse => Status is TaskListStatus.Ready or TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration or TaskListStatus.NeedsUpdate or TaskListStatus.NeedsConflict;
     public bool CanDelete => !IsActive;
+    public bool CanSync { get; init; }
+    public bool CanExitMapping { get; init; }
+    public string SyncToolTip { get; init; } = "退出映射并同步目录";
     public string UseGlyph { get; }
     public string UseToolTip { get; }
     public string AssessmentDetails { get; }
@@ -999,21 +1096,23 @@ public sealed class DirectoryStatusItem
 
     public static DirectoryStatusItem FromNormal(IsolationDirectorySnapshot directory)
     {
+        var targetTask = GetTargetTask(directory.LinkTarget);
         var isError = !directory.Exists || directory.Error is not null || directory.IsJunction;
-        var stateText = !directory.Exists ? "⚠ 目录缺失"
-            : directory.Error is not null ? "⚠ 工作副本中断"
-            : directory.IsJunction ? "⚠ 仍为 junction"
-            : directory.IsClean ? "● 干净"
-            : "⚠ 有未提交内容";
-        var detailText = !directory.Exists ? "配置的目录不存在"
-            : directory.Error ?? (directory.IsJunction ? "普通模式下不应存在 junction，请先处理"
-            : directory.IsClean ? "可以进入任务映射"
-            : $"已跟踪修改 {directory.TrackedChanges} 项 · 未版本化或忽略 {directory.UnversionedEntries} 项");
-        var location = directory.IsJunction ? "junction" : "普通目录";
+        var stateText = !directory.Exists ? "\u26a0 \u76ee\u5f55\u7f3a\u5931"
+            : directory.Error is not null ? "\u26a0 \u5de5\u4f5c\u526f\u672c\u4e2d\u65ad"
+            : directory.IsJunction ? $"\u76ee\u5f55\u6620\u5c04 \u00b7 {targetTask ?? "\u4efb\u52a1\u672a\u77e5"}"
+            : directory.IsClean ? "\u25cf \u5e72\u51c0"
+            : "\u26a0 \u6709\u672a\u63d0\u4ea4\u5185\u5bb9";
+        var detailText = !directory.Exists ? "\u914d\u7f6e\u7684\u76ee\u5f55\u4e0d\u5b58\u5728"
+            : directory.Error ?? (directory.IsJunction ? $"\u5b9e\u9645\u76ee\u6807\uff1a{directory.LinkTarget}"
+            : directory.IsClean ? "\u53ef\u4ee5\u8fdb\u5165\u4efb\u52a1\u6620\u5c04"
+            : $"\u5df2\u8ddf\u8e2a\u4fee\u6539 {directory.TrackedChanges} \u9879 \u00b7 \u672a\u7248\u672c\u5316\u6216\u5ffd\u7565 {directory.UnversionedEntries} \u9879");
+        var location = directory.IsJunction ? "\u76ee\u5f55\u6620\u5c04\uff08junction\uff09" : "\u9879\u76ee\u76ee\u5f55";
         return new DirectoryStatusItem
         {
             RelativePath = directory.RelativePath,
-            RevisionText = directory.Revision is null ? $"{location} · revision 未知" : $"{location} · r{directory.Revision}",
+            RevisionText = directory.Revision is null ? $"{location} \u00b7 revision \u672a\u77e5" : $"{location} \u00b7 r{directory.Revision}",
+            TargetText = directory.IsJunction ? $"\u2192 {directory.LinkTarget}" : string.Empty,
             StateText = stateText,
             DetailText = detailText,
             Background = new SolidColorBrush(Color.Parse(isError ? "#FFE1E1" : directory.IsClean ? "#DFF5E3" : "#FFF4D6")),
@@ -1021,8 +1120,16 @@ public sealed class DirectoryStatusItem
         };
     }
 
+    private static string? GetTargetTask(string? targetPath)
+    {
+        if (string.IsNullOrWhiteSpace(targetPath)) return null;
+        var directory = new DirectoryInfo(Path.GetFullPath(targetPath));
+        return directory.Parent?.Parent?.Name;
+    }
     public string RelativePath { get; private init; } = string.Empty;
     public string RevisionText { get; private init; } = string.Empty;
+    public string TargetText { get; private init; } = string.Empty;
+    public bool HasTarget => !string.IsNullOrWhiteSpace(TargetText);
     public string StateText { get; private init; } = string.Empty;
     public string DetailText { get; private init; } = string.Empty;
     public IBrush Background { get; private init; } = new SolidColorBrush(Colors.Transparent);

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Switch Codex task workspace"
+  short_description: "Read and edit the selected SVN task workspace"
+  default_prompt: "Bind the current Codex session to the requested SVN task workspace."

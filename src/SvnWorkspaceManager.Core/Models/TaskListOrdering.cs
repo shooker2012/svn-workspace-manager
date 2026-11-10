@@ -2,7 +2,7 @@ namespace SvnWorkspaceManager.Core.Models;
 
 public enum TaskListStatus
 {
-    // 任务本身已就绪的档位：任务内容已经跟隔离目录对齐，
+    // 任务本身已就绪的档位：任务内容已经跟任务映射目录对齐，
     // 只差父目录里的收尾动作，因此排在“需要更新任务”之前。
     CurrentTask = 0,
     Ready = 1,

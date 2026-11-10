@@ -5,6 +5,7 @@ using SvnWorkspaceManager.Core.Logging;
 using SvnWorkspaceManager.Core.Models;
 using SvnWorkspaceManager.Core.Process;
 using SvnWorkspaceManager.Core.Svn;
+using System.Text.Json;
 
 var applicationDirectory = Environment.GetEnvironmentVariable("SVN_WORKSPACE_MANAGER_HOME")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Azure", "SvnWorkspaceManager");
@@ -13,17 +14,40 @@ var logger = new WorkspaceLogger(Path.Combine(applicationDirectory, "logs"));
 var configuration = store.LoadConfiguration();
 var service = new WorkspaceService(store, configuration, new SvnClient(new ProcessRunner(logger), configuration.SvnExecutable), new JunctionManager());
 var command = args.Length == 0 ? "status" : args[0].ToLowerInvariant();
+var json = args.Any(argument => argument.Equals("--json", StringComparison.OrdinalIgnoreCase));
+var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+{
+    WriteIndented = true,
+    Converters = { new WorkspaceModeJsonConverter() }
+};
 
 try
 {
     switch (command)
     {
+        case "codex" when args.Length > 1 && args[1].Equals("context", StringComparison.OrdinalIgnoreCase):
+            var context = args.Length > 2 && args[2].Equals("--normal", StringComparison.OrdinalIgnoreCase)
+                ? service.GetCodexNormalContext()
+                : args.Length > 2 ? service.GetCodexTaskContext(args[2])
+                : throw new ArgumentException("codex context requires a task name or --normal");
+            if (json)
+                Console.WriteLine(JsonSerializer.Serialize(context, jsonOptions));
+            else
+                PrintCodexContext(context);
+            break;
+        case "codex" when args.Length > 1 && args[1].Equals("workspace-info", StringComparison.OrdinalIgnoreCase):
+            var workspaceInfo = service.GetCodexWorkspaceInfo();
+            if (json)
+                Console.WriteLine(JsonSerializer.Serialize(workspaceInfo, jsonOptions));
+            else
+                PrintCodexWorkspaceInfo(workspaceInfo);
+            break;
         case "status":
             var snapshot = await service.GetStatusAsync();
             Console.WriteLine($"模式：{ModeName(snapshot.State.Mode)}");
             Console.WriteLine($"项目目录：{configuration.ProjectRoot}");
             Console.WriteLine($"任务目录：{configuration.TaskRoot}");
-            Console.WriteLine($"隔离目录：{string.Join(", ", configuration.IsolatedDirectories)}");
+            Console.WriteLine($"任务映射目录：{string.Join(", ", configuration.IsolatedDirectories)}");
             Console.WriteLine($"当前任务：{snapshot.State.ActiveTask ?? "无"}");
             Console.WriteLine($"恢复状态：{snapshot.RestoreAssessment.Summary}");
             foreach (var directory in snapshot.RestoreAssessment.Directories)
@@ -65,7 +89,7 @@ try
             break;
         case "mapping" when args.Length > 1 && args[1].Equals("repair-parent", StringComparison.OrdinalIgnoreCase):
             await service.RepairIsolatedDirectoriesAsync();
-            Console.WriteLine("已修复普通模式下中断的父级隔离目录。");
+            Console.WriteLine("已修复普通模式下中断的父级任务映射目录。");
             break;
         case "mapping" when args.Length > 2 && args[1].Equals("migrate", StringComparison.OrdinalIgnoreCase):
             await service.CreateTaskFromCurrentChangesAsync(args[2]);
@@ -80,7 +104,7 @@ try
             Console.WriteLine("更新完成。");
             break;
         default:
-            Console.Error.WriteLine("用法：status | task list | task create <name> | task delete <name> | task remove <name> | mapping enable <name> | mapping migrate <name> | switch <name> | update | mapping disable | mapping restore | mapping repair | mapping repair-parent");
+            Console.Error.WriteLine("用法：status | task list | task create <name> | task delete <name> | task remove <name> | mapping enable <name> | mapping migrate <name> | switch <name> | update | mapping disable | mapping restore | mapping repair | mapping repair-parent | codex context <name> [--json] | codex context --normal [--json] | codex workspace-info [--json]");
             return 2;
     }
 }
@@ -95,3 +119,27 @@ logger.Info($"CLI 命令完成：{command}");
 return 0;
 
 static string ModeName(WorkspaceMode mode) => mode == WorkspaceMode.TaskMapping ? "任务映射模式" : "普通模式";
+
+
+static void PrintCodexContext(CodexTaskContext context)
+{
+    Console.WriteLine($"模式：{context.Mode}");
+    Console.WriteLine($"任务：{context.TaskName ?? "无"}");
+    Console.WriteLine($"工作区根目录：{context.WorkspaceRoot}");
+    Console.WriteLine($"任务工作区：{context.TaskRoot ?? "无"}");
+    Console.WriteLine($"可编辑：{(context.CanEdit ? "是" : "否")}");
+    foreach (var mapping in context.PathMappings)
+        Console.WriteLine($"{mapping.RelativePath}：{mapping.TargetPath}（{(mapping.Exists ? "存在" : "缺失")}）");
+}
+
+static void PrintCodexWorkspaceInfo(CodexWorkspaceInfo info)
+{
+    Console.WriteLine($"项目根目录：{info.ProjectRoot}");
+    Console.WriteLine($"任务根目录：{info.TaskRoot}");
+    Console.WriteLine($"模式：{ModeName(info.Mode)}");
+    Console.WriteLine($"当前映射任务：{info.ActiveTask ?? "无"}");
+    Console.WriteLine($"未完成操作：{(info.HasIncompleteOperation ? info.Operation!.Kind + " / " + info.Operation.Phase : "无")}");
+    Console.WriteLine($"任务：{(info.Tasks.Count == 0 ? "无" : string.Join("、", info.Tasks.Select(task => task.Name)))}");
+    foreach (var mapping in info.Mappings)
+        Console.WriteLine($"{mapping.RelativePath}：{(mapping.IsJunction ? mapping.TargetPath ?? "链接目标未知" : "普通目录")}（{(mapping.IsValid ? "有效" : "未映射或异常")}）");
+}

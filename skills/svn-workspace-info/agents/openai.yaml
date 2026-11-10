@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inspect SVN workspace"
+  short_description: "Read the project, task, and GUI mapping state"
+  default_prompt: "Read the current SVN workspace state without changing it."

@@ -35,7 +35,7 @@ public sealed partial class WorkspaceService
 
         var summary = directories.Count > 0 && directories.All(directory => directory.IsReady)
             ? "任务已与 trunk 对齐，可以进入任务映射模式。"
-            : "当前任务不能进入任务映射模式，请先处理版本不一致或阻断状态的隔离目录。";
+            : "当前任务不能进入任务映射模式，请先处理版本不一致或阻断状态的任务映射目录。";
         return new TaskMappingAssessment(task.Name, directories, summary);
     }
 
@@ -180,13 +180,13 @@ public sealed partial class WorkspaceService
             var taskPath = _guard.TaskPath(task.Name, relativePath);
             var status = await _svn.StatusIncludingUnversionedAsync(projectPath, cancellationToken);
             if (!status.Succeeded)
-                throw new InvalidOperationException($"无法读取隔离目录 {relativePath} 的 SVN 状态：{status.StandardError}");
+                throw new InvalidOperationException($"无法读取任务映射目录 {relativePath} 的 SVN 状态：{status.StandardError}");
 
             var entries = SvnStatusParser.Parse(status.StandardOutput, projectPath);
             if (entries.Any(entry => entry.HasBlockingFlag))
-                throw new InvalidOperationException($"隔离目录 {relativePath} 存在冲突、缺失、目录受阻或锁定，不能迁移。");
+                throw new InvalidOperationException($"任务映射目录 {relativePath} 存在冲突、缺失、目录受阻或锁定，不能迁移。");
             if (entries.Any(entry => entry.Code is not ('?' or 'I')))
-                throw new InvalidOperationException($"隔离目录 {relativePath} 存在已跟踪修改，请先提交或恢复，或使用“从当前修改进入映射”。");
+                throw new InvalidOperationException($"任务映射目录 {relativePath} 存在已跟踪修改，请先提交或恢复，或使用“从当前修改进入映射”。");
 
             foreach (var entry in entries.Where(entry => (entry.Code is '?' or 'I') && IsUnder(projectPath, entry.FullPath)).OrderBy(entry => entry.FullPath.Length))
             {
@@ -260,13 +260,13 @@ public sealed partial class WorkspaceService
 
             var tracked = entries.Where(entry => entry.Code is not ('?' or 'I')).ToList();
             var unversioned = entries.Where(entry => entry.Code is '?' or 'I').ToList();
-            var lines = new List<string> { $"隔离目录 {relativePath} 存在未提交内容：" };
+            var lines = new List<string> { $"任务映射目录 {relativePath} 存在未提交内容：" };
             if (tracked.Count > 0)
                 lines.Add($"  已跟踪修改 {tracked.Count} 项：{FormatStatusEntries(tracked, 5)}");
             if (unversioned.Count > 0)
                 lines.Add($"  未版本化或忽略 {unversioned.Count} 项：{FormatStatusEntries(unversioned, 5)}");
             lines.Add(tracked.Count > 0
-                ? "请提交或恢复已跟踪修改；未版本化或忽略内容可移出隔离目录，或使用“从当前修改进入映射”一并迁移。"
+                ? "请提交或恢复已跟踪修改；未版本化或忽略内容可移出任务映射目录，或使用“从当前修改进入映射”一并迁移。"
                 : "当前没有已跟踪修改，只有未版本化或忽略内容。可使用“从当前修改进入映射”把它们一并迁移到任务。");
             problems.Add(string.Join(Environment.NewLine, lines));
         }

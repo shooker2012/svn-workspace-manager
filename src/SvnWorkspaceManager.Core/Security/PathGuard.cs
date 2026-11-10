@@ -13,7 +13,7 @@ public sealed class PathGuard
 
     public string ProjectPath(string relativePath)
     {
-        if (Path.IsPathRooted(relativePath)) throw new InvalidOperationException("隔离目录必须是相对路径。");
+        if (Path.IsPathRooted(relativePath)) throw new InvalidOperationException("任务映射目录必须是相对路径。");
         var path = Normalize(Path.Combine(ProjectRoot, relativePath));
         EnsureUnder(ProjectRoot, path);
         return path;
@@ -22,7 +22,7 @@ public sealed class PathGuard
     public string TaskPath(string taskName, string relativePath)
     {
         ValidateTaskName(taskName);
-        if (Path.IsPathRooted(relativePath)) throw new InvalidOperationException("隔离目录必须是相对路径。");
+        if (Path.IsPathRooted(relativePath)) throw new InvalidOperationException("任务映射目录必须是相对路径。");
         var path = Normalize(Path.Combine(TaskRoot, taskName, relativePath));
         EnsureUnder(TaskRoot, path);
         return path;
