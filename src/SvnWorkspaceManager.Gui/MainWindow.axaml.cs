@@ -1,10 +1,13 @@
 using Avalonia.Controls;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using System.Runtime.InteropServices;
 using SvnWorkspaceManager.Core;
 using SvnWorkspaceManager.Core.Configuration;
 using SvnWorkspaceManager.Core.FileSystem;
@@ -18,6 +21,7 @@ namespace SvnWorkspaceManager.Gui;
 public partial class MainWindow : Window
 {
     private readonly WorkspaceStore _store;
+    private readonly ProjectGuiSession? _guiSession;
     private readonly WorkspaceLogger _logger;
     private readonly DispatcherTimer _busyTimer;
     private WorkspaceService _service;
@@ -35,13 +39,35 @@ public partial class MainWindow : Window
     private bool _initialized;
     private bool _mappingInconsistent;
 
-    public MainWindow()
+    public MainWindow() : this(null) { }
+
+    public MainWindow(string? projectRoot)
     {
         InitializeComponent();
         var applicationDirectory = Environment.GetEnvironmentVariable("SVN_WORKSPACE_MANAGER_HOME")
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Azure", "SvnWorkspaceManager");
-        _store = new WorkspaceStore(applicationDirectory);
+        if (!string.IsNullOrWhiteSpace(projectRoot))
+        {
+            var context = ProjectLocator.CreateContext(projectRoot, applicationDirectory);
+            if (!File.Exists(context.ConfigurationPath)) ProjectLocator.TryMigrateLegacy(applicationDirectory, context);
+            if (!File.Exists(context.ConfigurationPath))
+                throw new InvalidOperationException($"项目尚未导入：{context.ProjectRoot}。请先完成项目导入后再打开。");
+            _store = new WorkspaceStore(context.ApplicationDirectory);
+        }
+        else
+        {
+            _store = new WorkspaceStore(applicationDirectory);
+        }
         _configuration = _store.LoadConfiguration();
+        var loadedContext = ProjectLocator.FromConfiguration(_configuration, applicationDirectory);
+        var registry = new ProjectRegistry(applicationDirectory);
+        registry.EnsureNoConflict(_configuration);
+        if (!ProjectGuiSession.TryAcquire(ProjectIdentity.FromRoot(_configuration.ProjectRoot), out _guiSession))
+        {
+            MessageBox(IntPtr.Zero, $"项目已经在另一个 GUI 窗口中打开：{_configuration.ProjectRoot}", "SVN 工作区管理器", 0x00000040);
+            throw new InvalidOperationException($"项目已被其他 GUI 窗口打开：{_configuration.ProjectRoot}");
+        }
+        registry.Register(loadedContext);
         _logger = new WorkspaceLogger(Path.Combine(applicationDirectory, "logs"));
         _logger.Session($"GUI 启动：pid={Environment.ProcessId}，日志={_logger.LogPath}");
         _service = CreateService(_configuration, _logger);
@@ -49,6 +75,15 @@ public partial class MainWindow : Window
         _busyTimer.Tick += (_, _) => UpdateBusyIndicator();
         _ = RefreshStatusAsync();
     }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _guiSession?.Dispose();
+        base.OnClosed(e);
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
 
     private async Task RefreshStatusAsync()
     {
@@ -218,6 +253,13 @@ public partial class MainWindow : Window
     }
 
     private void TaskListSelectionChanged(object? sender, SelectionChangedEventArgs e) => UpdateActionAvailability();
+
+    private void ProjectPickerClick(object? sender, RoutedEventArgs e)
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop) return;
+        var picker = new ProjectPickerWindow(desktop, new ProjectRegistry(ProjectLocator.DefaultApplicationDirectory).List());
+        picker.Show(this);
+    }
 
     private void MainWindowKeyDown(object? sender, KeyEventArgs e)
     {
@@ -783,6 +825,7 @@ public partial class MainWindow : Window
         UpdateActionAvailabilitySafe();
         try
         {
+            using var operationLock = ProjectOperationLock.Acquire(ProjectIdentity.FromRoot(_configuration.ProjectRoot), TimeSpan.FromSeconds(5));
             _logger.Session($"GUI 操作开始：{actionName}");
             await action(cancellation.Token);
         }

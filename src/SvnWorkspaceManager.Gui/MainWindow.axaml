@@ -74,6 +74,7 @@
           </Border>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button Name="ProjectButton" Content="项目…" Click="ProjectPickerClick" ToolTip.Tip="打开项目选择器" />
           <Button Name="RefreshButton" Content="刷新状态" Click="RefreshStatusClick" />
           <Button Name="UpdateButton" Classes="primary" Content="更新项目 SVN" Click="UpdateClick" />
         </StackPanel>

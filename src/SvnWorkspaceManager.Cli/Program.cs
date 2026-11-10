@@ -7,14 +7,64 @@ using SvnWorkspaceManager.Core.Process;
 using SvnWorkspaceManager.Core.Svn;
 using System.Text.Json;
 
-var applicationDirectory = Environment.GetEnvironmentVariable("SVN_WORKSPACE_MANAGER_HOME")
-    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Azure", "SvnWorkspaceManager");
+var projectArgumentIndex = Array.FindIndex(args, argument => argument.Equals("--project", StringComparison.OrdinalIgnoreCase));
+string? requestedProject = null;
+var commandArgs = args;
+if (projectArgumentIndex >= 0)
+{
+    if (projectArgumentIndex + 1 >= args.Length) throw new ArgumentException("--project 需要项目根目录。");
+    requestedProject = args[projectArgumentIndex + 1];
+    commandArgs = args.Where((_, index) => index != projectArgumentIndex && index != projectArgumentIndex + 1).ToArray();
+}
+var applicationDirectory = ProjectLocator.DefaultApplicationDirectory;
+if (requestedProject is null && !File.Exists(Path.Combine(applicationDirectory, "config.json")) && new ProjectRegistry(applicationDirectory).List().Count == 0)
+    throw new InvalidOperationException("尚未指定项目。请使用 --project 指定已导入的 SVN 工作副本。");
+if (requestedProject is null && !File.Exists(Path.Combine(applicationDirectory, "config.json")))
+{
+    var current = ProjectIdentity.NormalizeRoot(Directory.GetCurrentDirectory());
+    var candidates = new ProjectRegistry(applicationDirectory).List()
+        .Where(item => current.Equals(item.ProjectRoot, StringComparison.OrdinalIgnoreCase)
+            || current.StartsWith(item.ProjectRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(item => item.ProjectRoot.Length)
+        .ToList();
+    if (candidates.Count == 1)
+    {
+        requestedProject = candidates[0].ProjectRoot;
+        var context = ProjectLocator.CreateContext(requestedProject, applicationDirectory);
+        applicationDirectory = context.ApplicationDirectory;
+    }
+    else if (candidates.Count > 1)
+        throw new InvalidOperationException("当前目录匹配多个项目，请使用 --project 指定项目根目录。");
+}
+if (requestedProject is not null)
+{
+    var context = ProjectLocator.CreateContext(requestedProject, applicationDirectory);
+    Directory.CreateDirectory(context.ApplicationDirectory);
+    ProjectLocator.TryMigrateLegacy(applicationDirectory, context);
+    var scopedConfig = Path.Combine(context.ApplicationDirectory, "config.json");
+    if (!File.Exists(scopedConfig))
+    {
+        var legacyStore = new WorkspaceStore(applicationDirectory);
+        var legacy = legacyStore.LoadConfiguration();
+        if (!Path.GetFullPath(legacy.ProjectRoot).Equals(context.ProjectRoot, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("指定项目尚未导入，且无法从旧配置自动迁移。请先在 GUI 中导入该 SVN 工作副本。");
+        new WorkspaceStore(context.ApplicationDirectory).SaveConfiguration(legacy);
+    }
+    applicationDirectory = context.ApplicationDirectory;
+}
 var store = new WorkspaceStore(applicationDirectory);
 var logger = new WorkspaceLogger(Path.Combine(applicationDirectory, "logs"));
 var configuration = store.LoadConfiguration();
+var registryRoot = requestedProject is null
+    ? applicationDirectory
+    : Directory.GetParent(Directory.GetParent(applicationDirectory)!.FullName)!.FullName;
+var projectContext = ProjectLocator.FromConfiguration(configuration, registryRoot);
+var projectRegistry = new ProjectRegistry(registryRoot);
+projectRegistry.EnsureNoConflict(configuration);
+projectRegistry.Register(projectContext);
 var service = new WorkspaceService(store, configuration, new SvnClient(new ProcessRunner(logger), configuration.SvnExecutable), new JunctionManager());
-var command = args.Length == 0 ? "status" : args[0].ToLowerInvariant();
-var json = args.Any(argument => argument.Equals("--json", StringComparison.OrdinalIgnoreCase));
+var command = commandArgs.Length == 0 ? "status" : commandArgs[0].ToLowerInvariant();
+var json = commandArgs.Any(argument => argument.Equals("--json", StringComparison.OrdinalIgnoreCase));
 var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 {
     WriteIndented = true,
@@ -23,19 +73,20 @@ var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 
 try
 {
+    using var operationLock = IsReadOnly(commandArgs) ? null : ProjectOperationLock.Acquire(ProjectIdentity.FromRoot(configuration.ProjectRoot), TimeSpan.FromSeconds(5));
     switch (command)
     {
-        case "codex" when args.Length > 1 && args[1].Equals("context", StringComparison.OrdinalIgnoreCase):
-            var context = args.Length > 2 && args[2].Equals("--normal", StringComparison.OrdinalIgnoreCase)
+        case "codex" when commandArgs.Length > 1 && commandArgs[1].Equals("context", StringComparison.OrdinalIgnoreCase):
+            var context = commandArgs.Length > 2 && commandArgs[2].Equals("--normal", StringComparison.OrdinalIgnoreCase)
                 ? service.GetCodexNormalContext()
-                : args.Length > 2 ? service.GetCodexTaskContext(args[2])
+                : commandArgs.Length > 2 ? service.GetCodexTaskContext(commandArgs[2])
                 : throw new ArgumentException("codex context requires a task name or --normal");
             if (json)
                 Console.WriteLine(JsonSerializer.Serialize(context, jsonOptions));
             else
                 PrintCodexContext(context);
             break;
-        case "codex" when args.Length > 1 && args[1].Equals("workspace-info", StringComparison.OrdinalIgnoreCase):
+        case "codex" when commandArgs.Length > 1 && commandArgs[1].Equals("workspace-info", StringComparison.OrdinalIgnoreCase):
             var workspaceInfo = service.GetCodexWorkspaceInfo();
             if (json)
                 Console.WriteLine(JsonSerializer.Serialize(workspaceInfo, jsonOptions));
@@ -57,47 +108,47 @@ try
             Console.WriteLine($"公共工作区状态：{(snapshot.ProjectStatus.Succeeded ? snapshot.ProjectStatus.StandardOutput.Trim() : snapshot.ProjectStatus.StandardError.Trim())}");
             foreach (var item in snapshot.TaskStatuses) Console.WriteLine($"{item.Key}：{item.Value.StandardOutput.Trim()}");
             break;
-        case "task" when args.Length > 1 && args[1].Equals("list", StringComparison.OrdinalIgnoreCase):
+        case "task" when commandArgs.Length > 1 && commandArgs[1].Equals("list", StringComparison.OrdinalIgnoreCase):
             foreach (var task in service.ListTasks()) Console.WriteLine($"{task.Name}\t{task.RootPath}\t{task.SvnUrl}");
             break;
-        case "task" when args.Length > 2 && args[1].Equals("create", StringComparison.OrdinalIgnoreCase):
-            Console.WriteLine($"已创建任务：{(await service.CreateTaskAsync(args[2])).Name}");
+        case "task" when commandArgs.Length > 2 && commandArgs[1].Equals("create", StringComparison.OrdinalIgnoreCase):
+            Console.WriteLine($"已创建任务：{(await service.CreateTaskAsync(commandArgs[2])).Name}");
             break;
-        case "task" when args.Length > 2 && args[1].Equals("remove", StringComparison.OrdinalIgnoreCase):
-            await service.RemoveTaskRecordAsync(args[2]);
-            Console.WriteLine($"已移除任务记录：{args[2]}（磁盘文件保留）");
+        case "task" when commandArgs.Length > 2 && commandArgs[1].Equals("remove", StringComparison.OrdinalIgnoreCase):
+            await service.RemoveTaskRecordAsync(commandArgs[2]);
+            Console.WriteLine($"已移除任务记录：{commandArgs[2]}（磁盘文件保留）");
             break;
-        case "task" when args.Length > 2 && args[1].Equals("delete", StringComparison.OrdinalIgnoreCase):
-            await service.DeleteTaskToRecycleBinAsync(args[2]);
-            Console.WriteLine($"已删除任务：{args[2]}（任务目录已移入 Windows 回收站）");
+        case "task" when commandArgs.Length > 2 && commandArgs[1].Equals("delete", StringComparison.OrdinalIgnoreCase):
+            await service.DeleteTaskToRecycleBinAsync(commandArgs[2]);
+            Console.WriteLine($"已删除任务：{commandArgs[2]}（任务目录已移入 Windows 回收站）");
             break;
-        case "mapping" when args.Length > 2 && args[1].Equals("enable", StringComparison.OrdinalIgnoreCase):
-            await service.EnableTaskMappingAsync(args[2]);
-            Console.WriteLine($"已进入任务映射模式：{args[2]}");
+        case "mapping" when commandArgs.Length > 2 && commandArgs[1].Equals("enable", StringComparison.OrdinalIgnoreCase):
+            await service.EnableTaskMappingAsync(commandArgs[2]);
+            Console.WriteLine($"已进入任务映射模式：{commandArgs[2]}");
             break;
-        case "mapping" when args.Length > 1 && args[1].Equals("disable", StringComparison.OrdinalIgnoreCase):
+        case "mapping" when commandArgs.Length > 1 && commandArgs[1].Equals("disable", StringComparison.OrdinalIgnoreCase):
             await service.ExitTaskMappingAsync();
             Console.WriteLine("已退出任务映射模式，任务工作区已保留，未复制任务内容到原目录。");
             break;
-        case "mapping" when args.Length > 1 && args[1].Equals("restore", StringComparison.OrdinalIgnoreCase):
+        case "mapping" when commandArgs.Length > 1 && commandArgs[1].Equals("restore", StringComparison.OrdinalIgnoreCase):
             await service.RestoreCurrentTaskToProjectAsync();
             Console.WriteLine("已恢复当前任务到原目录并退出任务映射模式。");
             break;
-        case "mapping" when args.Length > 1 && args[1].Equals("repair", StringComparison.OrdinalIgnoreCase):
+        case "mapping" when commandArgs.Length > 1 && commandArgs[1].Equals("repair", StringComparison.OrdinalIgnoreCase):
             await service.ResumeInterruptedOperationAsync();
             Console.WriteLine("已继续未完成的任务映射操作。");
             break;
-        case "mapping" when args.Length > 1 && args[1].Equals("repair-parent", StringComparison.OrdinalIgnoreCase):
+        case "mapping" when commandArgs.Length > 1 && commandArgs[1].Equals("repair-parent", StringComparison.OrdinalIgnoreCase):
             await service.RepairIsolatedDirectoriesAsync();
             Console.WriteLine("已修复普通模式下中断的父级任务映射目录。");
             break;
-        case "mapping" when args.Length > 2 && args[1].Equals("migrate", StringComparison.OrdinalIgnoreCase):
-            await service.CreateTaskFromCurrentChangesAsync(args[2]);
-            Console.WriteLine($"已从当前修改创建任务并进入任务映射模式：{args[2]}");
+        case "mapping" when commandArgs.Length > 2 && commandArgs[1].Equals("migrate", StringComparison.OrdinalIgnoreCase):
+            await service.CreateTaskFromCurrentChangesAsync(commandArgs[2]);
+            Console.WriteLine($"已从当前修改创建任务并进入任务映射模式：{commandArgs[2]}");
             break;
-        case "switch" when args.Length > 1:
-            await service.SwitchTaskAsync(args[1]);
-            Console.WriteLine($"已切换任务：{args[1]}");
+        case "switch" when commandArgs.Length > 1:
+            await service.SwitchTaskAsync(commandArgs[1]);
+            Console.WriteLine($"已切换任务：{commandArgs[1]}");
             break;
         case "update":
             await service.UpdateAsync();
@@ -119,6 +170,16 @@ logger.Info($"CLI 命令完成：{command}");
 return 0;
 
 static string ModeName(WorkspaceMode mode) => mode == WorkspaceMode.TaskMapping ? "任务映射模式" : "普通模式";
+
+static bool IsReadOnly(string[] commandArgs)
+{
+    if (commandArgs.Length == 0) return true;
+    if (commandArgs[0].Equals("status", StringComparison.OrdinalIgnoreCase)) return true;
+    return commandArgs[0].Equals("task", StringComparison.OrdinalIgnoreCase)
+        && commandArgs.Length > 1
+        && commandArgs[1].Equals("list", StringComparison.OrdinalIgnoreCase)
+        || commandArgs[0].Equals("codex", StringComparison.OrdinalIgnoreCase);
+}
 
 
 static void PrintCodexContext(CodexTaskContext context)

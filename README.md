@@ -20,6 +20,16 @@ CLI 为 `SvnWorkspaceManager.Cli.exe`，首次运行会在 `%LOCALAPPDATA%\Azure
 
 ## 首次配置
 
+程序现在按“项目”管理配置。一个项目对应一个本地 SVN 工作副本根目录、任务根目录和任务记录；不同项目可以同时打开，同一个项目只能有一个 GUI 窗口。启动 GUI 后从项目选择器导入已有 SVN 工作副本，程序不会创建空项目。
+
+CLI 可以显式指定项目：
+
+```powershell
+SvnWorkspaceManager.Cli.exe --project D:/W_client/Azure status
+```
+
+只读 CLI 查询可以和 GUI 同时运行；写操作会按项目串行执行。
+
 GUI 底部“配置”区域可以填写项目根目录、任务根目录、SVN trunk URL 和任务映射目录。等价的 `config.json` 示例：
 
 ```json
@@ -118,9 +128,9 @@ mapping repair-parent
 Codex 使用环境 PATH 中的 `SvnWorkspaceManager.Cli.exe` 获取编辑上下文，不要求 Skill 目录携带 CLI 二进制：
 
 ```powershell
-SvnWorkspaceManager.Cli.exe codex context TASK002 --json
-SvnWorkspaceManager.Cli.exe codex context --normal --json
-SvnWorkspaceManager.Cli.exe codex workspace-info --json
+SvnWorkspaceManager.Cli.exe --project D:/W_client/Azure codex context TASK002 --json
+SvnWorkspaceManager.Cli.exe --project D:/W_client/Azure codex context --normal --json
+SvnWorkspaceManager.Cli.exe --project D:/W_client/Azure codex workspace-info --json
 ```
 
 上下文以项目根目录为工作根；配置的任务映射目录通过 `pathMappings` 指向任务工作副本或项目目录。`codex context --normal` 只恢复 Codex 编辑上下文，不切换 GUI 映射、不修改 junction 或 SVN 状态。可运行 `powershell -ExecutionPolicy Bypass -File .\install-codex-skills.ps1` 安装仓库中的两个 Skill；脚本会复制 Skill 文件并检查 CLI 是否已在 PATH 中。
