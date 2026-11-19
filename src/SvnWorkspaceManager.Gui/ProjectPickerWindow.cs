@@ -27,7 +27,7 @@ public sealed class ProjectPickerWindow : Window
         _projects.ItemTemplate = new FuncDataTemplate<RegisteredProject>((project, _) => new StackPanel
         {
             Spacing = 3,
-            Children = { new TextBlock { Text = project.Name, FontSize = 16 }, new TextBlock { Text = project.ProjectRoot, Foreground = Avalonia.Media.Brushes.Gray } }
+            Children = { new TextBlock { Text = project.Name, FontSize = 16 }, new TextBlock { Text = project.ProjectRoot, Foreground = ThemePalette.Muted } }
         });
         var open = new Button { Content = "打开项目", HorizontalAlignment = HorizontalAlignment.Right };
         open.Click += (_, _) => OpenSelected();

@@ -7,7 +7,11 @@ namespace SvnWorkspaceManager.Gui;
 
 public partial class App : Application
 {
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        ThemePalette.Initialize(this);
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

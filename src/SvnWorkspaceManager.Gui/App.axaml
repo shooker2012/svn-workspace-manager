@@ -3,5 +3,103 @@
              x:Class="SvnWorkspaceManager.Gui.App">
   <Application.Styles>
     <FluentTheme />
+    <Style Selector=":is(Window)">
+      <Setter Property="ExtendClientAreaToDecorationsHint" Value="True" />
+      <Setter Property="ExtendClientAreaChromeHints" Value="PreferSystemChrome" />
+      <Setter Property="ExtendClientAreaTitleBarHeightHint" Value="32" />
+      <Setter Property="Padding" Value="{Binding WindowDecorationMargin, RelativeSource={RelativeSource Self}}" />
+      <Setter Property="Background" Value="{DynamicResource Canvas}" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="TitleBar">
+      <Setter Property="Background" Value="{DynamicResource Canvas}" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid>
+            <Panel Name="PART_MouseTracker" Height="1" VerticalAlignment="Top" />
+            <Grid Name="PART_Container" ColumnDefinitions="*,Auto">
+              <Border Name="PART_Background" Grid.ColumnSpan="2" Background="{TemplateBinding Background}"
+                      Win32Properties.NonClientHitTestResult="Caption" />
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="8,0" IsHitTestVisible="False">
+                <Image Source="/Assets/app-icon-a.png" Width="16" Height="16" />
+                <TextBlock Grid.Column="1" Text="{Binding $parent[Window].Title}" VerticalAlignment="Center"
+                           Foreground="{TemplateBinding Foreground}" FontSize="12" TextTrimming="CharacterEllipsis" />
+              </Grid>
+              <CaptionButtons Name="PART_CaptionButtons" Grid.Column="1" Foreground="{TemplateBinding Foreground}"
+                              Win32Properties.NonClientHitTestResult="Client" />
+            </Grid>
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Background" Value="{DynamicResource Panel}" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlLine}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource Primary}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Primary}" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource PrimaryHover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHover}" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="{DynamicResource ErrorFill}" />
+      <Setter Property="Foreground" Value="{DynamicResource Error}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ErrorLine}" />
+    </Style>
+    <Style Selector="Button.danger:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ErrorHover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ErrorLine}" />
+    </Style>
+    <Style Selector="Button.icon">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+      <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="Button.icon.danger-icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ErrorHover}" />
+      <Setter Property="Foreground" Value="{DynamicResource Error}" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Background" Value="{DynamicResource Panel}" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlLine}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ComboBox:pointerover">
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    </Style>
   </Application.Styles>
 </Application>

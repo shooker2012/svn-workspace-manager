@@ -1,76 +1,23 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:gui="using:SvnWorkspaceManager.Gui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SvnWorkspaceManager.Gui.MainWindow"
         KeyDown="MainWindowKeyDown"
         Width="1280" Height="820" MinWidth="1000" MinHeight="650"
-        Title="SVN 工作区管理器" Icon="avares://SvnWorkspaceManager.Gui/Assets/app-icon-a.ico" Background="#F4F6FA">
+        Title="SVN 工作区管理器" Icon="avares://SvnWorkspaceManager.Gui/Assets/app-icon-a.ico" Background="{DynamicResource Canvas}">
   <Window.Styles>
-    <Style Selector="Button">
-      <Setter Property="CornerRadius" Value="7" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#243247" />
-      <Setter Property="BorderBrush" Value="#C9D2DF" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="12,8" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Button:pointerover">
-      <Setter Property="Background" Value="#EEF4FC" />
-      <Setter Property="BorderBrush" Value="#7EA6D8" />
-    </Style>
-    <Style Selector="Button.primary">
-      <Setter Property="Background" Value="#2F6FEB" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#2F6FEB" />
-    </Style>
-    <Style Selector="Button.primary:pointerover">
-      <Setter Property="Background" Value="#245BC7" />
-      <Setter Property="BorderBrush" Value="#245BC7" />
-    </Style>
-    <Style Selector="Button.danger">
-      <Setter Property="Background" Value="#FFF5F5" />
-      <Setter Property="Foreground" Value="#B42318" />
-      <Setter Property="BorderBrush" Value="#F2B8B5" />
-    </Style>
-    <Style Selector="Button.danger:pointerover">
-      <Setter Property="Background" Value="#FFE5E5" />
-      <Setter Property="BorderBrush" Value="#D64545" />
-    </Style>
-    <Style Selector="Button.icon">
-      <Setter Property="Width" Value="28" />
-      <Setter Property="Height" Value="28" />
-      <Setter Property="MinWidth" Value="0" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="#5A6B84" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="Cursor" Value="Hand" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Button.icon:pointerover">
-      <Setter Property="Background" Value="#E7EEF9" />
-      <Setter Property="Foreground" Value="#2457A6" />
-    </Style>
-    <Style Selector="Button.icon.danger-icon:pointerover">
-      <Setter Property="Background" Value="#FDEAEA" />
-      <Setter Property="Foreground" Value="#B42318" />
-    </Style>
     <Style Selector="ListBoxItem">
       <Setter Property="Padding" Value="0" />
       <Setter Property="Margin" Value="0" />
     </Style>
   </Window.Styles>
   <Grid RowDefinitions="Auto,*,Auto" Margin="22">
-    <Border Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="12" Padding="18">
+    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="12" Padding="18">
       <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
         <StackPanel Orientation="Horizontal" Spacing="14">
-          <TextBlock Text="SVN 工作区管理器" FontSize="26" FontWeight="SemiBold" Foreground="#172033" />
-          <Border Background="#E7F0FF" CornerRadius="12" Padding="10,4" VerticalAlignment="Center">
-            <TextBlock Name="ModeText" Text="普通模式" Foreground="#2457A6" FontWeight="SemiBold" />
+          <TextBlock Text="SVN 工作区管理器" FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource Text}" />
+          <Border Background="{DynamicResource Selected}" CornerRadius="12" Padding="10,4" VerticalAlignment="Center">
+            <TextBlock Name="ModeText" Text="普通模式" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" />
           </Border>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
@@ -78,30 +25,30 @@
           <Button Name="RefreshButton" Content="刷新状态" Click="RefreshStatusClick" />
           <Button Name="UpdateButton" Classes="primary" Content="更新项目 SVN" Click="UpdateClick" />
         </StackPanel>
-        <TextBlock Name="ProjectPathText" Grid.Row="1" Text="项目根目录：正在读取…" Foreground="#637083" Margin="0,10,0,0" />
-        <TextBlock Name="CurrentTaskText" Grid.Row="1" Grid.Column="1" Text="当前任务：无" Foreground="#637083" Margin="18,10,0,0" />
+        <TextBlock Name="ProjectPathText" Grid.Row="1" Text="项目根目录：正在读取…" Foreground="{DynamicResource Muted}" Margin="0,10,0,0" />
+        <TextBlock Name="CurrentTaskText" Grid.Row="1" Grid.Column="1" Text="当前任务：无" Foreground="{DynamicResource Muted}" Margin="18,10,0,0" />
       </Grid>
     </Border>
 
     <Grid Grid.Row="1" ColumnDefinitions="310,*" ColumnSpacing="16" Margin="0,16,0,16">
-      <Border Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="12" Padding="16">
+      <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="12" Padding="16">
         <Grid Name="TaskPane" RowDefinitions="Auto,*,Auto" RowSpacing="12">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="任务工作区" FontSize="20" FontWeight="SemiBold" Foreground="#20242B" />
+            <TextBlock Text="任务工作区" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Text}" />
             <Button Name="NewTaskButton" Grid.Column="1" Content="＋ 新建" Click="NewTaskClick" ToolTip.Tip="只创建任务工作区，不自动建立映射" />
           </Grid>
-          <ListBox Name="TaskList" Grid.Row="1" Background="Transparent" Foreground="#20242B" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="TaskListSelectionChanged" PointerPressed="TaskListPointerPressed">
+          <ListBox Name="TaskList" Grid.Row="1" Background="Transparent" Foreground="{DynamicResource Text}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="TaskListSelectionChanged" PointerPressed="TaskListPointerPressed">
             <ListBox.ItemTemplate>
               <DataTemplate>
                 <Border Background="{Binding Background}" BorderBrush="{Binding BorderBrush}" BorderThickness="{Binding BorderThickness}" CornerRadius="8" Padding="9,7" Margin="0,2" ToolTip.Tip="{Binding RootPath}">
                   <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <TextBlock Text="{Binding DisplayName}" Foreground="{Binding Foreground}" FontWeight="{Binding DisplayWeight}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource Text}" FontWeight="{Binding DisplayWeight}" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Row="1" Text="{Binding StatusText}" Foreground="{Binding Foreground}" FontSize="11" TextTrimming="CharacterEllipsis" />
                     <StackPanel Grid.Column="1" Grid.RowSpan="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                      <Button Classes="icon" Foreground="#1557A6" Content="&#xE8B5;" Tag="{Binding Name}" Click="TaskItemSyncClick" IsVisible="{Binding CanSync}" ToolTip.Tip="{Binding SyncToolTip}" />
-                      <Button Classes="icon" Foreground="#5A6B84" Content="&#xE8AC;" Tag="{Binding Name}" Click="TaskItemExitMappingClick" IsVisible="{Binding CanExitMapping}" ToolTip.Tip="退出映射" />
+                      <Button Classes="icon" Foreground="{DynamicResource Accent}" Content="&#xE8B5;" Tag="{Binding Name}" Click="TaskItemSyncClick" IsVisible="{Binding CanSync}" ToolTip.Tip="{Binding SyncToolTip}" />
+                      <Button Classes="icon" Foreground="{DynamicResource Muted}" Content="&#xE8AC;" Tag="{Binding Name}" Click="TaskItemExitMappingClick" IsVisible="{Binding CanExitMapping}" ToolTip.Tip="退出映射" />
                       <Button Classes="icon" Foreground="{Binding ActionForeground}" Content="{Binding UseGlyph}" Tag="{Binding Name}" Click="TaskItemUseClick" IsVisible="{Binding CanUse}" ToolTip.Tip="{Binding UseToolTip}" />
-                      <Button Classes="icon danger-icon" Foreground="#B42318" Content="&#xE74D;" Tag="{Binding Name}" Click="TaskItemDeleteClick" IsVisible="{Binding CanDelete}" ToolTip.Tip="删除任务（移入回收站）" />
+                      <Button Classes="icon danger-icon" Foreground="{DynamicResource Error}" Content="&#xE74D;" Tag="{Binding Name}" Click="TaskItemDeleteClick" IsVisible="{Binding CanDelete}" ToolTip.Tip="删除任务（移入回收站）" />
                       <Button Classes="icon" Content="&#xE712;" Tag="{Binding Name}" Click="TaskItemMoreClick" ToolTip.Tip="更多任务操作" />
                     </StackPanel>
                   </Grid>
@@ -110,43 +57,43 @@
             </ListBox.ItemTemplate>
           </ListBox>
 
-          <Border Name="TaskActions" Grid.Row="2" BorderBrush="#E3E8F0" BorderThickness="0,1,0,0" Padding="0,12,0,0">
-            <TextBlock Name="SelectionHintText" Text="悬停在图标上可查看操作说明" Foreground="#7A8494" FontSize="11" TextWrapping="Wrap" />
+          <Border Name="TaskActions" Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+            <TextBlock Name="SelectionHintText" Text="悬停在图标上可查看操作说明" Foreground="{DynamicResource Muted}" FontSize="11" TextWrapping="Wrap" />
           </Border>
         </Grid>
       </Border>
 
       <Grid Grid.Column="1" RowDefinitions="*">
-        <Border Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="12" Padding="16">
+        <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="12" Padding="16">
           <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2">
-            <TextBlock Text="当前目录" FontSize="19" FontWeight="SemiBold" Foreground="#20242B" />
-            <Border Name="WorkspaceStateBadge" Grid.Column="1" Background="#EEF1F6" CornerRadius="10" Padding="10,3" VerticalAlignment="Center">
-              <TextBlock Name="WorkspaceStateText" Text="检查中…" FontSize="12" FontWeight="SemiBold" Foreground="#637083" />
+            <TextBlock Text="当前目录" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource Text}" />
+            <Border Name="WorkspaceStateBadge" Grid.Column="1" Background="{DynamicResource Hover}" CornerRadius="10" Padding="10,3" VerticalAlignment="Center">
+              <TextBlock Name="WorkspaceStateText" Text="检查中…" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" />
             </Border>
-            <TextBlock Name="WorkspacePathText" Grid.Row="1" Text="目录映射：检查中…" Foreground="#637083" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
-              <TextBlock Name="PublicStatusText" Grid.Row="1" Grid.Column="1" Text="项目 SVN：待检查" Foreground="#637083" Margin="16,8,0,0" />
+            <TextBlock Name="WorkspacePathText" Grid.Row="1" Text="目录映射：检查中…" Foreground="{DynamicResource Muted}" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+              <TextBlock Name="PublicStatusText" Grid.Row="1" Grid.Column="1" Text="项目 SVN：待检查" Foreground="{DynamicResource Muted}" Margin="16,8,0,0" />
             <StackPanel Name="ReadinessPanel" Grid.Row="2" Grid.ColumnSpan="2" Spacing="3" Margin="0,10,0,0">
-              <TextBlock Name="ParentCheckText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="父目录：正在检查…" />
-              <TextBlock Name="TaskCheckText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="任务：请先选择" />
-              <TextBlock Name="ActionHintText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="#637083" Text="" />
+              <TextBlock Name="ParentCheckText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" Text="父目录：正在检查…" />
+              <TextBlock Name="TaskCheckText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" Text="任务：请先选择" />
+              <TextBlock Name="ActionHintText" IsVisible="False" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" Text="" />
               <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
                 <Button Name="MigrateCurrentButton" Content="从当前修改进入映射" Click="MigrateCurrentChangesClick" IsVisible="False" ToolTip.Tip="把任务映射目录里的已跟踪修改和未版本化文件迁移到新任务，并进入映射" />
-                <Button Name="RepairWorkingCopyButton" Content="修复父级工作副本" Click="RepairWorkingCopyClick" IsVisible="False" Background="#FFF4D6" BorderBrush="#E0B84A" ToolTip.Tip="仅修复因进入映射中断而处于 Schedule: delete 的父级目录，保留未版本化和忽略文件" />
+                <Button Name="RepairWorkingCopyButton" Content="修复父级工作副本" Click="RepairWorkingCopyClick" IsVisible="False" Background="{DynamicResource WarningFill}" BorderBrush="{DynamicResource WarningLine}" ToolTip.Tip="仅修复因进入映射中断而处于 Schedule: delete 的父级目录，保留未版本化和忽略文件" />
                 <Button Name="RestoreButton" Content="退出映射并同步目录" Click="RestoreCurrentTaskClick" IsVisible="False" IsEnabled="False" ToolTip.ShowOnDisabled="True" />
               </StackPanel>
-              <TextBlock Name="RestoreStatusText" IsVisible="False" Foreground="#936400" FontSize="12" TextWrapping="Wrap" />
+              <TextBlock Name="RestoreStatusText" IsVisible="False" Foreground="{DynamicResource Warning}" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
-            <Border Grid.Row="3" Grid.ColumnSpan="2" Background="#F8FAFD" BorderBrush="#E3E8F0" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,8,0,0">
+            <Border Grid.Row="3" Grid.ColumnSpan="2" Background="{DynamicResource Inset}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,8,0,0">
               <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
-                <TextBlock Name="DirectoryHintText" IsVisible="False" Grid.Row="1" Text="正在读取任务映射目录状态…" Foreground="#637083" TextWrapping="Wrap" />
+                <TextBlock Name="DirectoryHintText" IsVisible="False" Grid.Row="1" Text="正在读取任务映射目录状态…" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
                 <ListBox Name="DirectoryStatusList" Grid.Row="2" Background="Transparent" BorderThickness="0" MinHeight="60" MaxHeight="280">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <Border Background="{Binding Background}" CornerRadius="8" Padding="10" Margin="0,2" ToolTip.Tip="{Binding DetailText}">
                         <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
-                          <TextBlock Text="{Binding RelativePath}" Foreground="#20242B" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding RelativePath}" Foreground="{DynamicResource Text}" FontWeight="SemiBold" />
                           <TextBlock Grid.Column="1" Text="{Binding StateText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" />
-                          <TextBlock Grid.Row="1" Text="{Binding TargetText}" IsVisible="{Binding HasTarget}" Foreground="#637083" FontSize="12" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Row="1" Text="{Binding TargetText}" IsVisible="{Binding HasTarget}" Foreground="{DynamicResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" />
                           <Button Grid.Column="2" Grid.RowSpan="2" Content="打开目录" Tag="{Binding RelativePath}" Click="OpenIsolationDirectoryClick" VerticalAlignment="Center" Margin="10,0,0,0" Padding="8,4" FontSize="12" ToolTip.Tip="在文件资源管理器中打开这个项目目录" />
                         </Grid>
                       </Border>
@@ -162,39 +109,41 @@
     </Grid>
 
     <Grid Grid.Row="2" RowDefinitions="Auto,Auto" RowSpacing="8">
-      <Border Name="MessageCard" Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="10" Padding="14,10">
+      <Border Name="MessageCard" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="14,10">
         <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="4">
-          <TextBlock Name="MessageTitle" Text="消息" FontSize="12" FontWeight="SemiBold" Foreground="#637083" />
+          <TextBlock Name="MessageTitle" Text="消息" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" />
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
             <Button Name="CancelOperationButton" Content="取消操作" Click="CancelOperationClick" IsVisible="False" Classes="danger" Padding="10,4" FontSize="12" ToolTip.Tip="请求中止当前 SVN 命令或文件操作" />
             <Button Name="OpenLogButton" Content="打开日志" Click="OpenLogClick" Padding="10,4" FontSize="12" ToolTip.Tip="打开 workspace-manager.log 所在目录" />
           </StackPanel>
-          <TextBox Name="StatusText" Grid.Row="1" Grid.ColumnSpan="2" Text="正在加载..." Foreground="#20242B" Background="Transparent" BorderThickness="0" Padding="0" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="150" />
+          <TextBox Name="StatusText" Grid.Row="1" Grid.ColumnSpan="2" Text="正在加载..." Foreground="{DynamicResource Text}" Background="Transparent" BorderThickness="0" Padding="0" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="150" />
         </Grid>
       </Border>
-      <Expander Name="SettingsExpander" Grid.Row="1" Header="配置（项目、任务根目录和任务映射目录）" Foreground="#425066">
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="7" Margin="4,10,4,2">
-          <TextBlock Text="项目根目录" VerticalAlignment="Center" />
-          <TextBox Name="ProjectRootBox" Grid.Column="1" />
-          <TextBlock Text="任务根目录" Grid.Row="1" VerticalAlignment="Center" />
-          <TextBox Name="TaskRootBox" Grid.Row="1" Grid.Column="1" />
-          <TextBlock Text="SVN trunk URL" Grid.Row="2" VerticalAlignment="Center" />
-          <TextBox Name="SvnUrlBox" Grid.Row="2" Grid.Column="1" />
-          <TextBlock Text="任务映射目录（每行一个相对路径）" Grid.Row="3" VerticalAlignment="Center" />
-          <TextBox Name="IsolatedDirectoriesBox" Grid.Row="3" Grid.Column="1" AcceptsReturn="True" MinHeight="58" />
-          <Button Content="保存配置" Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left" Click="SaveConfigurationClick" />
+      <Expander Name="SettingsExpander" Grid.Row="1" Header="配置（项目、任务根目录和任务映射目录）" Foreground="{DynamicResource Muted}">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="7" Margin="4,10,4,2">
+          <TextBlock Text="界面主题" VerticalAlignment="Center" />
+          <gui:ThemePicker Grid.Column="1" HorizontalAlignment="Left" />
+          <TextBlock Text="项目根目录" Grid.Row="1" VerticalAlignment="Center" />
+          <TextBox Name="ProjectRootBox" Grid.Row="1" Grid.Column="1" />
+          <TextBlock Text="任务根目录" Grid.Row="2" VerticalAlignment="Center" />
+          <TextBox Name="TaskRootBox" Grid.Row="2" Grid.Column="1" />
+          <TextBlock Text="SVN trunk URL" Grid.Row="3" VerticalAlignment="Center" />
+          <TextBox Name="SvnUrlBox" Grid.Row="3" Grid.Column="1" />
+          <TextBlock Text="任务映射目录（每行一个相对路径）" Grid.Row="4" VerticalAlignment="Center" />
+          <TextBox Name="IsolatedDirectoriesBox" Grid.Row="4" Grid.Column="1" AcceptsReturn="True" MinHeight="58" />
+          <Button Content="保存配置" Grid.Row="5" Grid.Column="1" HorizontalAlignment="Left" Click="SaveConfigurationClick" />
         </Grid>
       </Expander>
     </Grid>
 
-    <Grid Name="BusyOverlay" Grid.RowSpan="3" Margin="-22" Panel.ZIndex="1000" IsVisible="False" IsHitTestVisible="True" Background="#990E1626">
-      <Border Width="420" MinHeight="190" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="14" Padding="26">
+    <Grid Name="BusyOverlay" Grid.RowSpan="3" Margin="-22" Panel.ZIndex="1000" IsVisible="False" IsHitTestVisible="True" Background="{DynamicResource Overlay}">
+      <Border Width="420" MinHeight="190" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="14" Padding="26">
         <StackPanel Spacing="14">
-          <TextBlock Text="正在执行操作" FontSize="20" FontWeight="SemiBold" Foreground="#172033" HorizontalAlignment="Center" />
-          <TextBlock Name="BusyActionText" Text="请稍候…" FontSize="15" Foreground="#2457A6" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+          <TextBlock Text="正在执行操作" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Text}" HorizontalAlignment="Center" />
+          <TextBlock Name="BusyActionText" Text="请稍候…" FontSize="15" Foreground="{DynamicResource Accent}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
           <ProgressBar IsIndeterminate="True" Height="6" Width="300" HorizontalAlignment="Center" />
-          <TextBlock Name="BusyProgressText" Text="正在准备…" FontSize="12" Foreground="#637083" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
-          <TextBlock Name="BusyElapsedText" Text="已用时 0 秒" FontSize="12" Foreground="#7A8494" HorizontalAlignment="Center" />
+          <TextBlock Name="BusyProgressText" Text="正在准备…" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+          <TextBlock Name="BusyElapsedText" Text="已用时 0 秒" FontSize="12" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" />
           <Button Name="BusyCancelButton" Content="取消操作" Click="CancelOperationClick" Classes="danger" HorizontalAlignment="Center" Padding="18,7" />
         </StackPanel>
       </Border>

@@ -299,7 +299,7 @@ public partial class MainWindow : Window
             Children =
             {
                 new TextBlock { Text = "创建独立 SVN 任务工作区", FontSize = 20, FontWeight = FontWeight.SemiBold },
-                new TextBlock { Text = "仅从 trunk 检出一个新任务，不会设置映射，也不会改变当前原目录。", TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.Parse("#637083")) },
+                new TextBlock { Text = "仅从 trunk 检出一个新任务，不会设置映射，也不会改变当前原目录。", TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = ThemePalette.Muted },
                 nameBox,
                 buttons
             }
@@ -341,7 +341,7 @@ public partial class MainWindow : Window
             Children =
             {
                 new TextBlock { Text = "从当前原目录创建任务", FontSize = 20, FontWeight = FontWeight.SemiBold },
-                new TextBlock { Text = "会把任务映射目录中的修改、未版本化和忽略文件迁移到新任务，并立即进入任务映射模式。", TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.Parse("#637083")) },
+                new TextBlock { Text = "会把任务映射目录中的修改、未版本化和忽略文件迁移到新任务，并立即进入任务映射模式。", TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = ThemePalette.Muted },
                 nameBox,
                 buttons
             }
@@ -540,13 +540,13 @@ public partial class MainWindow : Window
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 13,
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.Parse(danger ? "#B42318" : "#5A6B84"))
+                Foreground = danger ? ThemePalette.Error : ThemePalette.Muted
             },
             MinWidth = 196,
             Padding = new Avalonia.Thickness(10, 6),
             FontSize = 12.5
         };
-        if (danger) item.Foreground = new SolidColorBrush(Color.Parse("#B42318"));
+        if (danger) item.Foreground = ThemePalette.Error;
         item.Click += async (_, _) =>
         {
             try
@@ -611,8 +611,8 @@ public partial class MainWindow : Window
             WorkspaceStateText.Text = _mappingInconsistent
                 ? "映射异常"
                 : string.IsNullOrWhiteSpace(state.ActiveTask) ? "目录映射已启用" : $"目录映射 · {state.ActiveTask}";
-            WorkspaceStateBadge.Background = new SolidColorBrush(Color.Parse(_mappingInconsistent ? "#FFE1E1" : "#DCEBFF"));
-            WorkspaceStateText.Foreground = new SolidColorBrush(Color.Parse(_mappingInconsistent ? "#B42318" : "#1557A6"));
+            WorkspaceStateBadge.Background = _mappingInconsistent ? ThemePalette.ErrorFill : ThemePalette.Selected;
+            WorkspaceStateText.Foreground = _mappingInconsistent ? ThemePalette.Error : ThemePalette.Accent;
             ToolTip.SetTip(WorkspaceStateText, _mappingInconsistent
                 ? "保存的活动任务与项目目录中的实际 junction 不一致，请先刷新或修复目录映射。"
                 : "项目目录中的任务映射目录当前通过 junction 指向活动任务。 ");
@@ -635,7 +635,7 @@ public partial class MainWindow : Window
                         : parentBlocked
                             ? "父目录：有已跟踪修改"
                             : "父目录：有待迁移文件";
-        SetCheck(ParentCheckText, parentSummary, parentClean ? "#237A3B" : parentDamaged ? "#936400" : "#2C7A4B");
+        SetCheck(ParentCheckText, parentSummary, !parentClean && parentDamaged ? ThemePalette.Warning : ThemePalette.Success);
         ToolTip.SetTip(ParentCheckText, _isolationDirectories.Count == 0
             ? "尚未配置任务映射目录。"
             : parentClean
@@ -652,7 +652,7 @@ public partial class MainWindow : Window
                     : selectedAssessment?.Directories.Any(directory => directory.HasBlockingStatus) == true
                         ? "任务：需处理冲突"
                         : "任务：需更新";
-        SetCheck(TaskCheckText, taskSummary, taskReady ? "#237A3B" : hasSelection ? "#936400" : "#637083");
+        SetCheck(TaskCheckText, taskSummary, taskReady ? ThemePalette.Success : hasSelection ? ThemePalette.Warning : ThemePalette.Muted);
         ToolTip.SetTip(TaskCheckText, !hasSelection
             ? "选择任务后查看详细映射资格。"
             : string.Join(Environment.NewLine, selectedAssessment?.Directories.Select(directory => $"{directory.RelativePath}：{directory.Reason}") ?? []));
@@ -671,7 +671,7 @@ public partial class MainWindow : Window
             : !parentClean
                 ? "下一步：迁移文件"
             : "下一步：进入映射";
-        ActionHintText.Foreground = new SolidColorBrush(Color.Parse(parentBlocked ? "#2C7A4B" : ready ? "#237A3B" : "#637083"));
+        ActionHintText.Foreground = parentBlocked || ready ? ThemePalette.Success : ThemePalette.Muted;
 
         WorkspaceStateText.Text = _busy
             ? "执行中…"
@@ -681,10 +681,8 @@ public partial class MainWindow : Window
             : parentDamaged ? "⚠ 目录状态异常"
             : _isolationDirectories.Count == 0 ? "未配置目录"
             : "普通目录 · 有本地修改";
-        WorkspaceStateBadge.Background = new SolidColorBrush(Color.Parse(
-            _mappingInconsistent ? "#FFE1E1" : parentClean ? "#DFF5E3" : "#FFF4D6"));
-        WorkspaceStateText.Foreground = new SolidColorBrush(Color.Parse(
-            _mappingInconsistent ? "#B42318" : parentClean ? "#237A3B" : "#936400"));
+        WorkspaceStateBadge.Background = _mappingInconsistent ? ThemePalette.ErrorFill : parentClean ? ThemePalette.SuccessFill : ThemePalette.WarningFill;
+        WorkspaceStateText.Foreground = _mappingInconsistent ? ThemePalette.Error : parentClean ? ThemePalette.Success : ThemePalette.Warning;
         ToolTip.SetTip(WorkspaceStateText, _mappingInconsistent
             ? "普通模式下仍发现 junction，或实际目录映射与保存状态不一致。"
             : "当前项目目录没有启用任务 junction。 ");
@@ -721,10 +719,10 @@ public partial class MainWindow : Window
         return normalized.Contains(marker, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void SetCheck(TextBlock block, string text, string color)
+    private static void SetCheck(TextBlock block, string text, IBrush color)
     {
         block.Text = text;
-        block.Foreground = new SolidColorBrush(Color.Parse(color));
+        block.Foreground = color;
     }
 
     private static string DescribeIsolationProblem(IsolationDirectorySnapshot directory)
@@ -741,12 +739,12 @@ public partial class MainWindow : Window
     private void SetMessage(string text, bool isError = false)
     {
         StatusText.Text = text;
-        MessageCard.Background = new SolidColorBrush(Color.Parse(isError ? "#FFF5F5" : "#FFFFFF"));
-        MessageCard.BorderBrush = new SolidColorBrush(Color.Parse(isError ? "#E05B5B" : "#D9DEE7"));
+        MessageCard.Background = isError ? ThemePalette.ErrorFill : ThemePalette.Panel;
+        MessageCard.BorderBrush = isError ? ThemePalette.ErrorLine : ThemePalette.Line;
         MessageCard.BorderThickness = new Avalonia.Thickness(isError ? 2 : 1);
         MessageTitle.Text = isError ? "操作失败" : "消息";
-        MessageTitle.Foreground = new SolidColorBrush(Color.Parse(isError ? "#B42318" : "#637083"));
-        StatusText.Foreground = new SolidColorBrush(Color.Parse(isError ? "#8A1C13" : "#20242B"));
+        MessageTitle.Foreground = isError ? ThemePalette.Error : ThemePalette.Muted;
+        StatusText.Foreground = isError ? ThemePalette.Error : ThemePalette.Text;
     }
 
     private async Task ExitTaskMappingAsync()
@@ -1002,8 +1000,8 @@ public partial class MainWindow : Window
 
     private static void SetValidity(TextBox box, bool valid)
     {
-        box.Background = new SolidColorBrush(Color.Parse(valid ? "#DFF5E3" : "#FFE1E1"));
-        box.BorderBrush = new SolidColorBrush(Color.Parse(valid ? "#53A869" : "#D64545"));
+        box.Background = valid ? ThemePalette.SuccessFill : ThemePalette.ErrorFill;
+        box.BorderBrush = valid ? ThemePalette.SuccessLine : ThemePalette.ErrorLine;
     }
 
     private async Task<bool> ConfirmAsync(string title, string message, string confirmLabel)
@@ -1059,8 +1057,6 @@ public sealed class TaskListItem
         Status = TaskListOrdering.GetStatus(task.Name, valid, assessment, activeTask, parentStatus, mode);
         IsActive = Status == TaskListStatus.CurrentTask;
         DisplayName = IsActive ? $"当前任务 · {task.Name}" : task.Name;
-        var green = Status is TaskListStatus.CurrentTask or TaskListStatus.Ready;
-        var taskReadyWithParentAction = Status is TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration;
         (UseGlyph, UseToolTip) = Status switch
         {
             TaskListStatus.CurrentTask => ("\uE73E", "当前任务已处于映射状态"),
@@ -1081,20 +1077,15 @@ public sealed class TaskListItem
             TaskListStatus.NeedsUpdate => "⚠ 需更新",
             _ => "⚠ 目录不完整"
         };
-        var parentBlocked = Status == TaskListStatus.ParentBlocked;
-        Background = new SolidColorBrush(Color.Parse(Status == TaskListStatus.CurrentTask ? "#DCEBFF" : Status is TaskListStatus.Incomplete or TaskListStatus.NeedsConflict ? "#FFE1E1" : parentBlocked ? "#E6F5EA" : taskReadyWithParentAction ? "#EAF6EE" : green ? "#DFF5E3" : "#FFF4D6"));
-        Foreground = new SolidColorBrush(Color.Parse(Status == TaskListStatus.CurrentTask ? "#1557A6" : Status is TaskListStatus.Incomplete or TaskListStatus.NeedsConflict ? "#B42318" : parentBlocked ? "#2C7A4B" : taskReadyWithParentAction ? "#3C7A5A" : green ? "#237A3B" : "#936400"));
-        ActionForeground = new SolidColorBrush(Color.Parse(Status switch
+        (Background, Foreground) = Status switch
         {
-            TaskListStatus.Ready => "#2F6FEB",
-            TaskListStatus.CurrentTask => "#237A3B",
-            TaskListStatus.ParentBlocked => "#2C7A4B",
-            TaskListStatus.NeedsMigration => "#3C7A5A",
-            TaskListStatus.NeedsConflict => "#B42318",
-            TaskListStatus.Incomplete => "#B42318",
-            _ => "#936400"
-        }));
-        BorderBrush = new SolidColorBrush(Color.Parse(IsActive ? "#2F6FEB" : "#E1E6EE"));
+            TaskListStatus.CurrentTask => (ThemePalette.Selected, ThemePalette.Accent),
+            TaskListStatus.Incomplete or TaskListStatus.NeedsConflict => (ThemePalette.ErrorFill, ThemePalette.Error),
+            TaskListStatus.Ready or TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration => (ThemePalette.SuccessFill, ThemePalette.Success),
+            _ => (ThemePalette.WarningFill, ThemePalette.Warning)
+        };
+        ActionForeground = IsActive ? ThemePalette.Success : Status == TaskListStatus.Ready ? ThemePalette.Accent : Foreground;
+        BorderBrush = IsActive ? ThemePalette.Accent : ThemePalette.Line;
         BorderThickness = IsActive ? new Avalonia.Thickness(3, 1, 1, 1) : new Avalonia.Thickness(1);
         DisplayWeight = IsActive ? FontWeight.Bold : FontWeight.SemiBold;
     }
@@ -1133,8 +1124,8 @@ public sealed class DirectoryStatusItem
         RevisionText = $"任务 r{assessment.TaskRevision?.ToString() ?? "未知"} / 恢复目标 r{assessment.TargetRevision?.ToString() ?? "未知"}",
         StateText = assessment.IsReady ? "● 可恢复" : "⚠ 不可恢复",
         DetailText = assessment.Reason,
-        Background = new SolidColorBrush(Color.Parse(assessment.IsReady ? "#DFF5E3" : assessment.MappingValid ? "#FFF4D6" : "#FFE1E1")),
-        Foreground = new SolidColorBrush(Color.Parse(assessment.IsReady ? "#237A3B" : assessment.MappingValid ? "#936400" : "#B42318"))
+        Background = assessment.IsReady ? ThemePalette.SuccessFill : assessment.MappingValid ? ThemePalette.WarningFill : ThemePalette.ErrorFill,
+        Foreground = assessment.IsReady ? ThemePalette.Success : assessment.MappingValid ? ThemePalette.Warning : ThemePalette.Error
     };
 
     public static DirectoryStatusItem FromNormal(IsolationDirectorySnapshot directory)
@@ -1158,8 +1149,8 @@ public sealed class DirectoryStatusItem
             TargetText = directory.IsJunction ? $"\u2192 {directory.LinkTarget}" : string.Empty,
             StateText = stateText,
             DetailText = detailText,
-            Background = new SolidColorBrush(Color.Parse(isError ? "#FFE1E1" : directory.IsClean ? "#DFF5E3" : "#FFF4D6")),
-            Foreground = new SolidColorBrush(Color.Parse(isError ? "#B42318" : directory.IsClean ? "#237A3B" : "#936400"))
+            Background = isError ? ThemePalette.ErrorFill : directory.IsClean ? ThemePalette.SuccessFill : ThemePalette.WarningFill,
+            Foreground = isError ? ThemePalette.Error : directory.IsClean ? ThemePalette.Success : ThemePalette.Warning
         };
     }
 
@@ -1176,5 +1167,5 @@ public sealed class DirectoryStatusItem
     public string StateText { get; private init; } = string.Empty;
     public string DetailText { get; private init; } = string.Empty;
     public IBrush Background { get; private init; } = new SolidColorBrush(Colors.Transparent);
-    public IBrush Foreground { get; private init; } = new SolidColorBrush(Colors.Black);
+    public IBrush Foreground { get; private init; } = ThemePalette.Text;
 }
