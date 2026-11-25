@@ -123,7 +123,7 @@ mapping repair
 mapping repair-parent
 ```
 
-### Codex 集成
+### Codex 与 Cursor 集成
 
 Codex 使用环境 PATH 中的 `SvnWorkspaceManager.Cli.exe` 获取编辑上下文，不要求 Skill 目录携带 CLI 二进制：
 
@@ -133,7 +133,7 @@ SvnWorkspaceManager.Cli.exe --project D:/W_client/Azure codex context --normal -
 SvnWorkspaceManager.Cli.exe --project D:/W_client/Azure codex workspace-info --json
 ```
 
-上下文以项目根目录为工作根；配置的任务映射目录通过 `pathMappings` 指向任务工作副本或项目目录。`codex context --normal` 只恢复 Codex 编辑上下文，不切换 GUI 映射、不修改 junction 或 SVN 状态。可运行 `powershell -ExecutionPolicy Bypass -File .\install-codex-skills.ps1` 安装仓库中的两个 Skill；脚本会复制 Skill 文件并检查 CLI 是否已在 PATH 中。
+上下文以项目根目录为工作根；配置的任务映射目录通过 `pathMappings` 指向任务工作副本或项目目录。`codex context --normal` 只恢复 Codex 编辑上下文，不切换 GUI 映射、不修改 junction 或 SVN 状态。可运行 `powershell -ExecutionPolicy Bypass -File .\install-agent-skills.ps1` 把仓库中的两个 Skill 同时安装到 Codex 的 `~/.agents/skills` 和 Cursor 的 `~/.cursor/skills`；脚本会检查 CLI 是否已在 PATH 中。
 
 `task delete` 会把任务目录移入 Windows 回收站并移除任务记录；`task remove` 只移除记录，磁盘上的任务文件保留。
 

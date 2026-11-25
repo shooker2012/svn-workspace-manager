@@ -1,6 +1,7 @@
 ---
 name: svn-workspace-info
-description: 当用户用 `$svn-workspace-info` 查看 SVN 项目工作区时，读取指定项目的配置、任务记录和当前 GUI 映射状态并简洁报告；只读，不改变 Codex 编辑上下文。
+description: 当用户通过 `$svn-workspace-info` 或 `/svn-workspace-info` 查看 SVN 项目工作区时，读取指定项目的配置、任务记录和当前 GUI 映射状态并简洁报告；只读，不改变代理编辑上下文。
+disable-model-invocation: true
 ---
 
 # SVN 工作区信息
@@ -16,6 +17,6 @@ SvnWorkspaceManager.Cli.exe --project "D:\Work\Azure" codex workspace-info --jso
 
 报告项目根目录、任务根目录、任务映射目录、当前模式、活动映射任务、每个任务映射目录的实际 junction 目标和有效性、可用任务，以及是否存在未完成操作。
 
-此 Skill 不切换任务、不建立或删除 junction、不更新 SVN、不恢复目录，也不改变 `$svn-task-workspace` 已建立的 Codex 编辑上下文。
+此 Skill 不切换任务、不建立或删除 junction、不更新 SVN、不恢复目录，也不改变 `svn-task-workspace` 已建立的代理编辑上下文。
 
 如果 CLI 失败，原样报告关键错误，并说明没有修改任何工作区状态。

@@ -1,30 +1,34 @@
 ---
 name: svn-task-workspace
-description: 当用户用 `$svn-task-workspace <任务名>` 指定 Codex 当前要编辑的 SVN 项目任务时，读取指定项目中的任务实际工作目录并建立本会话的任务编辑上下文；不切换 GUI 映射。
+description: 当用户通过 `$svn-task-workspace <任务名>` 或 `/svn-task-workspace <任务名>` 指定当前要编辑的 SVN 项目任务时，读取指定项目中的任务实际工作目录并建立本会话的任务编辑上下文；不切换 GUI 映射。
+disable-model-invocation: true
 ---
 
 # SVN 任务工作区
 
-这是一个显式命令 Skill。它只负责让 Codex 在指定任务上下文中编辑代码，不操作项目目录的 junction，也不切换 SVN 工作区管理器的 GUI 状态。
+这是一个显式命令 Skill。它只负责让 AI 编程代理在指定任务上下文中编辑代码，不操作项目目录的 junction，也不切换 SVN 工作区管理器的 GUI 状态。
 
 ## 命令
 
-绑定任务：
+Codex 使用 `$` 前缀，Cursor 使用 `/` 前缀。绑定任务：
 
 ```text
 $svn-task-workspace TASK002
+/svn-task-workspace TASK002
 ```
 
 恢复项目上下文：
 
 ```text
 $svn-task-workspace --normal
+/svn-task-workspace --normal
 ```
 
 多项目环境下，如果当前目录不能唯一确定项目，使用项目根目录限定上下文：
 
 ```text
 $svn-task-workspace --project D:\Work\Azure TASK002
+/svn-task-workspace --project D:\Work\Azure TASK002
 ```
 
 ## 绑定任务
@@ -47,7 +51,7 @@ SvnWorkspaceManager.Cli.exe --project "D:\Work\Azure" codex context --normal --j
 
 项目公共文件使用 `workspaceRoot` 下的真实路径。配置任务映射目录使用 `pathMappings` 中的 `targetPath`。任务模式下目标位于任务工作副本，普通模式下目标位于项目目录。
 
-任务名只是 Codex 的编辑上下文，不要求 GUI 切换到该任务。当前 GUI 映射到哪个任务不影响本 Skill 的编辑路径。
+任务名只是当前代理会话的编辑上下文，不要求 GUI 切换到该任务。当前 GUI 映射到哪个任务不影响本 Skill 的编辑路径。
 
 如果存在多个项目且当前目录无法唯一匹配，必须要求用户提供 `--project` 对应的项目根目录；不要从 SVN URL、任务名或项目名称猜测项目。
 
