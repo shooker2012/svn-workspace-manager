@@ -125,14 +125,16 @@ public partial class MainWindow : Window
         SvnUrlBox.Text = configuration.SvnTrunkUrl;
         IsolatedDirectoriesBox.Text = string.Join(Environment.NewLine, configuration.IsolatedDirectories);
         ProjectPathText.Text = $"项目根目录：{configuration.ProjectRoot}";
-        CurrentTaskText.Text = $"当前任务：{state.ActiveTask ?? "无"}";
         WorkspacePathText.Text = "目录映射：检查中…";
         PublicStatusText.Text = "项目 SVN：正在检查…";
         SetValidity(ProjectRootBox, Directory.Exists(configuration.ProjectRoot));
         SetValidity(TaskRootBox, Directory.Exists(configuration.TaskRoot));
         SetValidity(SvnUrlBox, !string.IsNullOrWhiteSpace(configuration.SvnTrunkUrl));
         SetValidity(IsolatedDirectoriesBox, configuration.IsolatedDirectories.Count > 0 && configuration.IsolatedDirectories.All(IsSafeRelativePath));
-        ModeText.Text = state.Mode == WorkspaceMode.Normal ? "普通模式" : $"目录映射：{state.ActiveTask}";
+        ModeText.Text = state.Mode == WorkspaceMode.Normal ? "普通模式" : "目录映射";
+        ToolTip.SetTip(ModeText, state.Mode == WorkspaceMode.Normal
+            ? "当前未启用任务映射"
+            : $"当前任务：{state.ActiveTask ?? "未知任务"}");
         var tasks = _store.ListTasks().OrderBy(task => task.Name).ToList();
         var taskAssessments = new Dictionary<string, TaskMappingAssessment>(StringComparer.OrdinalIgnoreCase);
         var checks = tasks.Select(async task =>
@@ -693,7 +695,9 @@ public partial class MainWindow : Window
         DirectoryHintText.IsVisible = _mappingInconsistent;
         if (state.Mode == WorkspaceMode.TaskMapping)
         {
-            DirectoryStatusList.ItemsSource = _isolationDirectories.Select(DirectoryStatusItem.FromNormal).ToList();
+            DirectoryStatusList.ItemsSource = _isolationDirectories
+                .Select(directory => DirectoryStatusItem.FromMapping(directory, state.ActiveTask))
+                .ToList();
             DirectoryHintText.Text = _mappingInconsistent ? "发现目录映射异常，请检查下面的实际目标" : "当前每个项目目录的实际 junction 目标";
             return;
         }
@@ -1056,7 +1060,7 @@ public sealed class TaskListItem
             : string.Join(Environment.NewLine, assessment.Directories.Select(directory => $"{directory.RelativePath}：{directory.Reason}"));
         Status = TaskListOrdering.GetStatus(task.Name, valid, assessment, activeTask, parentStatus, mode);
         IsActive = Status == TaskListStatus.CurrentTask;
-        DisplayName = IsActive ? $"当前任务 · {task.Name}" : task.Name;
+        DisplayName = task.Name;
         (UseGlyph, UseToolTip) = Status switch
         {
             TaskListStatus.CurrentTask => ("\uE73E", "当前任务已处于映射状态"),
@@ -1067,20 +1071,28 @@ public sealed class TaskListItem
             TaskListStatus.NeedsUpdate => ("\uE72C", "任务版本落后；点击直接更新到 trunk"),
             _ => ("\uE783", "任务目录不完整")
         };
+        var changeText = assessment.Directories.Count == 0
+            ? "状态未知"
+            : assessment.IsClean ? "干净"
+            : $"修改 {assessment.TotalChanges} 项";
         StatusText = Status switch
         {
-            TaskListStatus.CurrentTask => "◆ 映射中",
-            TaskListStatus.Ready => "● 就绪",
-            TaskListStatus.ParentBlocked => "● 任务已就绪 · 先清理父目录",
-            TaskListStatus.NeedsMigration => "● 任务已就绪 · 需迁移本地文件",
+            TaskListStatus.CurrentTask => $"◆ 映射中 · {changeText}",
+            TaskListStatus.Ready => $"● 就绪 · {changeText}",
+            TaskListStatus.ParentBlocked => $"● 任务已就绪 · 先清理父目录 · {changeText}",
+            TaskListStatus.NeedsMigration => $"● 任务已就绪 · 需迁移本地文件 · {changeText}",
             TaskListStatus.NeedsConflict => "⚠ 需处理冲突",
             TaskListStatus.NeedsUpdate => "⚠ 需更新",
             _ => "⚠ 目录不完整"
         };
+        DeleteToolTip = assessment.Directories.Count > 0 && assessment.IsClean && !IsActive
+            ? "任务目录干净，已无本地修改，可以删除"
+            : "删除任务（移入回收站）";
         (Background, Foreground) = Status switch
         {
             TaskListStatus.CurrentTask => (ThemePalette.Selected, ThemePalette.Accent),
             TaskListStatus.Incomplete or TaskListStatus.NeedsConflict => (ThemePalette.ErrorFill, ThemePalette.Error),
+            TaskListStatus.Ready or TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration when assessment.TotalChanges > 0 => (ThemePalette.WarningFill, ThemePalette.Warning),
             TaskListStatus.Ready or TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration => (ThemePalette.SuccessFill, ThemePalette.Success),
             _ => (ThemePalette.WarningFill, ThemePalette.Warning)
         };
@@ -1095,6 +1107,7 @@ public sealed class TaskListItem
     public string DisplayName { get; }
     public bool CanUse => Status is TaskListStatus.Ready or TaskListStatus.ParentBlocked or TaskListStatus.NeedsMigration or TaskListStatus.NeedsUpdate or TaskListStatus.NeedsConflict;
     public bool CanDelete => !IsActive;
+    public string DeleteToolTip { get; }
     public bool CanSync { get; init; }
     public bool CanExitMapping { get; init; }
     public string SyncToolTip { get; init; } = "退出映射并同步目录";
@@ -1149,8 +1162,37 @@ public sealed class DirectoryStatusItem
             TargetText = directory.IsJunction ? $"\u2192 {directory.LinkTarget}" : string.Empty,
             StateText = stateText,
             DetailText = detailText,
+            ChangeText = directory.IsClean ? "无本地修改" : $"已跟踪修改 {directory.TrackedChanges} 项 · 未版本化 {directory.UnversionedEntries} 项",
             Background = isError ? ThemePalette.ErrorFill : directory.IsClean ? ThemePalette.SuccessFill : ThemePalette.WarningFill,
             Foreground = isError ? ThemePalette.Error : directory.IsClean ? ThemePalette.Success : ThemePalette.Warning
+        };
+    }
+
+    public static DirectoryStatusItem FromMapping(IsolationDirectorySnapshot directory, string? activeTask)
+    {
+        var targetTask = GetTargetTask(directory.LinkTarget);
+        var targetMatches = directory.IsJunction
+            && !string.IsNullOrWhiteSpace(activeTask)
+            && string.Equals(targetTask, activeTask, StringComparison.OrdinalIgnoreCase);
+        var isError = !directory.Exists || directory.Error is not null || !targetMatches;
+        var stateText = !directory.Exists ? "⚠ 目录缺失"
+            : directory.Error is not null ? "⚠ 工作副本中断"
+            : targetMatches ? $"目录映射 · {targetTask}"
+            : "⚠ 映射目标不一致";
+        var detailText = !directory.Exists ? "配置的目录不存在"
+            : directory.Error ?? (targetMatches
+                ? $"实际目标：{directory.LinkTarget}"
+                : $"实际目标：{directory.LinkTarget ?? "未建立 junction"}");
+        return new DirectoryStatusItem
+        {
+            RelativePath = directory.RelativePath,
+            RevisionText = directory.Revision is null ? "映射目录 · revision 未知" : $"映射目录 · r{directory.Revision}",
+            TargetText = directory.IsJunction ? $"→ {directory.LinkTarget}" : string.Empty,
+            StateText = stateText,
+            DetailText = detailText,
+            ChangeText = directory.IsClean ? "无本地修改" : $"已跟踪修改 {directory.TrackedChanges} 项 · 未版本化 {directory.UnversionedEntries} 项",
+            Background = isError ? ThemePalette.ErrorFill : ThemePalette.Selected,
+            Foreground = isError ? ThemePalette.Error : ThemePalette.Accent
         };
     }
 
@@ -1166,6 +1208,7 @@ public sealed class DirectoryStatusItem
     public bool HasTarget => !string.IsNullOrWhiteSpace(TargetText);
     public string StateText { get; private init; } = string.Empty;
     public string DetailText { get; private init; } = string.Empty;
+    public string ChangeText { get; private init; } = string.Empty;
     public IBrush Background { get; private init; } = new SolidColorBrush(Colors.Transparent);
     public IBrush Foreground { get; private init; } = ThemePalette.Text;
 }

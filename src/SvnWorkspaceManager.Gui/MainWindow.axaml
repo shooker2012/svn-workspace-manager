@@ -26,7 +26,6 @@
           <Button Name="UpdateButton" Classes="primary" Content="更新项目 SVN" Click="UpdateClick" />
         </StackPanel>
         <TextBlock Name="ProjectPathText" Grid.Row="1" Text="项目根目录：正在读取…" Foreground="{DynamicResource Muted}" Margin="0,10,0,0" />
-        <TextBlock Name="CurrentTaskText" Grid.Row="1" Grid.Column="1" Text="当前任务：无" Foreground="{DynamicResource Muted}" Margin="18,10,0,0" />
       </Grid>
     </Border>
 
@@ -48,7 +47,7 @@
                       <Button Classes="icon" Foreground="{DynamicResource Accent}" Content="&#xE8B5;" Tag="{Binding Name}" Click="TaskItemSyncClick" IsVisible="{Binding CanSync}" ToolTip.Tip="{Binding SyncToolTip}" />
                       <Button Classes="icon" Foreground="{DynamicResource Muted}" Content="&#xE8AC;" Tag="{Binding Name}" Click="TaskItemExitMappingClick" IsVisible="{Binding CanExitMapping}" ToolTip.Tip="退出映射" />
                       <Button Classes="icon" Foreground="{Binding ActionForeground}" Content="{Binding UseGlyph}" Tag="{Binding Name}" Click="TaskItemUseClick" IsVisible="{Binding CanUse}" ToolTip.Tip="{Binding UseToolTip}" />
-                      <Button Classes="icon danger-icon" Foreground="{DynamicResource Error}" Content="&#xE74D;" Tag="{Binding Name}" Click="TaskItemDeleteClick" IsVisible="{Binding CanDelete}" ToolTip.Tip="删除任务（移入回收站）" />
+                      <Button Classes="icon danger-icon" Foreground="{DynamicResource Error}" Content="&#xE74D;" Tag="{Binding Name}" Click="TaskItemDeleteClick" IsVisible="{Binding CanDelete}" ToolTip.Tip="{Binding DeleteToolTip}" />
                       <Button Classes="icon" Content="&#xE712;" Tag="{Binding Name}" Click="TaskItemMoreClick" ToolTip.Tip="更多任务操作" />
                     </StackPanel>
                   </Grid>
@@ -94,6 +93,7 @@
                           <TextBlock Text="{Binding RelativePath}" Foreground="{DynamicResource Text}" FontWeight="SemiBold" />
                           <TextBlock Grid.Column="1" Text="{Binding StateText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" />
                           <TextBlock Grid.Row="1" Text="{Binding TargetText}" IsVisible="{Binding HasTarget}" Foreground="{DynamicResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ChangeText}" Foreground="{DynamicResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
                           <Button Grid.Column="2" Grid.RowSpan="2" Content="打开目录" Tag="{Binding RelativePath}" Click="OpenIsolationDirectoryClick" VerticalAlignment="Center" Margin="10,0,0,0" Padding="8,4" FontSize="12" ToolTip.Tip="在文件资源管理器中打开这个项目目录" />
                         </Grid>
                       </Border>

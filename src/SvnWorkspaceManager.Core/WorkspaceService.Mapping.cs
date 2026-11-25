@@ -17,20 +17,23 @@ public sealed partial class WorkspaceService
             var taskPath = _guard.TaskPath(task.Name, relativePath);
             var taskInfoResult = await _svn.WorkingCopyInfoAsync(taskPath, cancellationToken);
             var targetRevisionResult = await _svn.RepositoryLastChangedRevisionAsync(expectedUrl, cancellationToken);
-            var status = await _svn.StatusAsync(taskPath, cancellationToken);
+            var status = await _svn.StatusIncludingUnversionedAsync(taskPath, cancellationToken);
+            var entries = status.Succeeded ? SvnStatusParser.Parse(status.StandardOutput, taskPath) : [];
             var taskInfo = taskInfoResult.Info;
             var taskRevision = taskInfo?.Revision;
             var targetRevision = targetRevisionResult.Revision;
             var urlMatches = taskInfo is not null && taskInfo.Url.Equals(expectedUrl, StringComparison.OrdinalIgnoreCase);
             var revisionMatches = taskRevision is not null && targetRevision is not null && taskRevision >= targetRevision;
-            var hasBlockingStatus = !status.Succeeded || SvnStatusParser.ContainsBlockingStatus(status.StandardOutput, Path.GetDirectoryName(taskPath)!);
+            var hasBlockingStatus = !status.Succeeded || entries.Any(entry => entry.HasBlockingFlag);
+            var trackedChanges = entries.Count(entry => entry.Code is not ('?' or 'I'));
+            var unversionedEntries = entries.Count(entry => entry.Code is '?' or 'I');
             var reason = taskInfo is null ? "无法读取任务工作副本信息"
                 : targetRevision is null ? $"无法读取 trunk 目录的最后变更 revision：{targetRevisionResult.Result.StandardError.Trim()}"
                 : !urlMatches ? "任务 SVN URL 与配置的 trunk 路径不一致"
                 : hasBlockingStatus ? "任务工作区存在冲突、缺失、目录受阻或锁定"
                 : !revisionMatches ? $"任务 r{taskRevision} 落后于 trunk 目录的最后变更 r{targetRevision}，请先更新任务"
                 : "任务已包含 trunk 目录的最新变更";
-            directories.Add(new TaskMappingDirectoryAssessment(relativePath, taskRevision, targetRevision, expectedUrl, taskInfo?.Url, revisionMatches, urlMatches, hasBlockingStatus, reason));
+            directories.Add(new TaskMappingDirectoryAssessment(relativePath, taskRevision, targetRevision, expectedUrl, taskInfo?.Url, revisionMatches, urlMatches, hasBlockingStatus, reason, trackedChanges, unversionedEntries));
         }
 
         var summary = directories.Count > 0 && directories.All(directory => directory.IsReady)

@@ -110,9 +110,13 @@ public sealed record TaskMappingDirectoryAssessment(
     bool RevisionMatches,
     bool UrlMatches,
     bool HasBlockingStatus,
-    string Reason)
+    string Reason,
+    int TrackedChanges = 0,
+    int UnversionedEntries = 0)
 {
     public bool IsReady => RevisionMatches && UrlMatches && !HasBlockingStatus;
+    public int TotalChanges => TrackedChanges + UnversionedEntries;
+    public bool IsClean => TotalChanges == 0;
 }
 
 public sealed record TaskMappingAssessment(
@@ -121,6 +125,8 @@ public sealed record TaskMappingAssessment(
     string Summary)
 {
     public bool IsReady => Directories.Count > 0 && Directories.All(directory => directory.IsReady);
+    public int TotalChanges => Directories.Sum(directory => directory.TotalChanges);
+    public bool IsClean => Directories.Count > 0 && Directories.All(directory => directory.IsClean);
 }
 
 public sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Duration)
