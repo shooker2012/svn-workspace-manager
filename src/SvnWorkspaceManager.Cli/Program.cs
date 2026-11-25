@@ -16,6 +16,7 @@ if (projectArgumentIndex >= 0)
     requestedProject = args[projectArgumentIndex + 1];
     commandArgs = args.Where((_, index) => index != projectArgumentIndex && index != projectArgumentIndex + 1).ToArray();
 }
+var readOnly = IsReadOnly(commandArgs);
 var applicationDirectory = ProjectLocator.DefaultApplicationDirectory;
 if (requestedProject is null && !File.Exists(Path.Combine(applicationDirectory, "config.json")) && new ProjectRegistry(applicationDirectory).List().Count == 0)
     throw new InvalidOperationException("尚未指定项目。请使用 --project 指定已导入的 SVN 工作副本。");
@@ -61,7 +62,7 @@ var registryRoot = requestedProject is null
 var projectContext = ProjectLocator.FromConfiguration(configuration, registryRoot);
 var projectRegistry = new ProjectRegistry(registryRoot);
 projectRegistry.EnsureNoConflict(configuration);
-projectRegistry.Register(projectContext);
+if (!readOnly) projectRegistry.Register(projectContext);
 var service = new WorkspaceService(store, configuration, new SvnClient(new ProcessRunner(logger), configuration.SvnExecutable), new JunctionManager());
 var command = commandArgs.Length == 0 ? "status" : commandArgs[0].ToLowerInvariant();
 var json = commandArgs.Any(argument => argument.Equals("--json", StringComparison.OrdinalIgnoreCase));
@@ -73,7 +74,7 @@ var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 
 try
 {
-    using var operationLock = IsReadOnly(commandArgs) ? null : ProjectOperationLock.Acquire(ProjectIdentity.FromRoot(configuration.ProjectRoot), TimeSpan.FromSeconds(5));
+    using var operationLock = readOnly ? null : ProjectOperationLock.Acquire(ProjectIdentity.FromRoot(configuration.ProjectRoot), TimeSpan.FromSeconds(5));
     switch (command)
     {
         case "codex" when commandArgs.Length > 1 && commandArgs[1].Equals("context", StringComparison.OrdinalIgnoreCase):

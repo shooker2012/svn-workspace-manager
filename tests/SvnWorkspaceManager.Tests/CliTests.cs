@@ -61,6 +61,19 @@ public sealed class CliTests
     }
 
     [TestMethod]
+    public async Task Cli_ReadOnlyCodexCommand_DoesNotWriteProjectRegistry()
+    {
+        using var repo = SvnTestRepository.Create();
+        await repo.Service.CreateTaskAsync("t1");
+        Directory.CreateDirectory(Path.Combine(repo.Home, "projects.json.tmp"));
+
+        var output = repo.RunCli("codex", "workspace-info", "--json");
+        using var document = JsonDocument.Parse(output);
+
+        Assert.AreEqual(Path.GetFullPath(repo.ProjectRoot), document.RootElement.GetProperty("projectRoot").GetString());
+    }
+
+    [TestMethod]
     public async Task Cli_CodexNormalContext_UsesProjectDirectoriesWithoutChangingState()
     {
         using var repo = SvnTestRepository.Create();
